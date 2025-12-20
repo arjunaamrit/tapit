@@ -2,14 +2,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import HeroSection from "@/components/HeroSection";
 import FeatureSection from "@/components/FeatureSection";
 import InvestmentSection from "@/components/InvestmentSection";
 import Footer from "@/components/Footer";
 import AboutFounder from "@/components/AboutFounder";
 import BusinessModel from "@/components/BusinessModel";
-import SearchSummarize from "@/components/SearchSummarize";
 
 const Index = () => {
   return (
@@ -39,12 +37,6 @@ const Index = () => {
         {/* Main content */}
         <main>
           <HeroSection />
-          
-          {/* AI Search Section */}
-          <section id="search" className="py-16">
-            <SearchSummarize />
-          </section>
-          
           <FeatureSection />
           <BusinessModel />
           <InvestmentSection />
