@@ -13,12 +13,12 @@ interface EnhancedDocumentUploaderProps {
 const supportedFormats = [
   { ext: '.pdf', type: 'application/pdf', label: 'PDF' },
   { ext: '.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word' },
+  { ext: '.epub', type: 'application/epub+zip', label: 'EPUB' },
   { ext: '.txt', type: 'text/plain', label: 'Text' },
   { ext: '.md', type: 'text/markdown', label: 'Markdown' },
   { ext: '.html', type: 'text/html', label: 'HTML' },
   { ext: '.rtf', type: 'application/rtf', label: 'RTF' },
 ];
-
 const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: EnhancedDocumentUploaderProps) => {
   const { toast } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -28,6 +28,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
     const validTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/epub+zip',
       'text/plain',
       'text/markdown',
       'text/html',
@@ -35,18 +36,17 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
       'text/rtf',
     ];
     
-    const validExtensions = ['.pdf', '.docx', '.txt', '.md', '.markdown', '.html', '.htm', '.rtf'];
+    const validExtensions = ['.pdf', '.docx', '.epub', '.txt', '.md', '.markdown', '.html', '.htm', '.rtf'];
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF, DOCX, TXT, Markdown, HTML, or RTF file.",
+        description: "Please upload a PDF, DOCX, EPUB, TXT, Markdown, HTML, or RTF file.",
         variant: "destructive",
       });
       return;
     }
-
     if (file.size > 10 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -221,7 +221,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
           
           <input
             type="file"
-            accept=".pdf,.docx,.txt,.md,.markdown,.html,.htm,.rtf"
+            accept=".pdf,.docx,.epub,.txt,.md,.markdown,.html,.htm,.rtf"
             onChange={handleFileSelect}
             className="hidden"
             id="document-upload"
