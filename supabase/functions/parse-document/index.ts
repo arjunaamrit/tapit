@@ -7,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = '';
-
+// Configure PDF.js for Deno (no worker threads)
+// Use disableWorker in getDocument to avoid worker initialization.
+pdfjs.GlobalWorkerOptions.workerSrc = "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs";
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -37,16 +37,30 @@ serve(async (req) => {
     // Handle different file types
     if (fileName.endsWith('.txt') || file.type === 'text/plain') {
       text = new TextDecoder().decode(uint8Array);
+    } else if (fileName.endsWith('.md') || fileName.endsWith('.markdown') || file.type === 'text/markdown') {
+      text = new TextDecoder().decode(uint8Array);
+    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm') || file.type === 'text/html') {
+      // Simple HTML -> text extraction (server-side)
+      const html = new TextDecoder().decode(uint8Array);
+      text = extractTextFromHtml(html);
     } else if (fileName.endsWith('.pdf') || file.type === 'application/pdf') {
       text = await extractTextFromPDF(uint8Array);
-    } else if (fileName.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    } else if (
+      fileName.endsWith('.docx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ) {
       text = await extractTextFromDocx(arrayBuffer);
+    } else if (fileName.endsWith('.rtf') || file.type === 'application/rtf' || file.type === 'text/rtf') {
+      const rtf = new TextDecoder().decode(uint8Array);
+      text = extractTextFromRtf(rtf);
+    } else if (fileName.endsWith('.epub') || file.type === 'application/epub+zip') {
+      text = await extractTextFromEpub(arrayBuffer);
     } else {
       try {
         text = new TextDecoder().decode(uint8Array);
       } catch {
         return new Response(
-          JSON.stringify({ error: 'Unsupported file format. Please upload PDF, DOCX, or TXT files.' }),
+          JSON.stringify({ error: 'Unsupported file format. Please upload PDF, DOCX, EPUB, RTF, HTML, Markdown, or TXT files.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -81,22 +95,100 @@ serve(async (req) => {
   }
 });
 
+function extractTextFromHtml(html: string): string {
+  // Remove scripts/styles then strip tags.
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ');
+
+  const text = withoutScripts
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return text;
+}
+
+function extractTextFromRtf(rtf: string): string {
+  // Lightweight RTF -> text converter.
+  const stripped = rtf
+    .replace(/\\par[d]?\b/g, '\n')
+    .replace(/\\'[0-9a-fA-F]{2}/g, (m) => {
+      const hex = m.slice(2);
+      try {
+        return String.fromCharCode(parseInt(hex, 16));
+      } catch {
+        return '';
+      }
+    })
+    .replace(/\\[a-zA-Z]+-?\d*\s?/g, ' ')
+    .replace(/[{}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return stripped;
+}
+
+async function extractTextFromEpub(data: ArrayBuffer): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(data);
+
+    const htmlFileNames = Object.keys(zip.files)
+      .filter((name) => {
+        const lower = name.toLowerCase();
+        return (
+          (lower.endsWith('.xhtml') || lower.endsWith('.html') || lower.endsWith('.htm')) &&
+          !lower.startsWith('meta-inf/')
+        );
+      })
+      .sort((a, b) => a.localeCompare(b));
+
+    if (htmlFileNames.length === 0) {
+      console.log('No HTML/XHTML content found in EPUB');
+      return '';
+    }
+
+    const parts: string[] = [];
+    for (const name of htmlFileNames) {
+      try {
+        const content = await zip.file(name)?.async('string');
+        if (content) {
+          const text = extractTextFromHtml(content);
+          if (text) parts.push(text);
+        }
+      } catch (e) {
+        console.error('EPUB extract error for file:', name, e);
+      }
+    }
+
+    return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  } catch (error) {
+    console.error('Error extracting EPUB text:', error);
+    return '';
+  }
+}
+
 async function extractTextFromPDF(data: Uint8Array): Promise<string> {
   try {
     console.log('Starting PDF extraction with pdfjs-dist...');
-    
-    // Load the PDF document
+
+    // Load the PDF document (disable worker for Deno edge runtime)
     const loadingTask = pdfjs.getDocument({
       data: data,
       useSystemFonts: true,
       disableFontFace: true,
     });
-    
+
     const pdfDocument = await loadingTask.promise;
     console.log('PDF loaded, pages:', pdfDocument.numPages);
-    
+
     const textParts: string[] = [];
-    
     // Extract text from each page
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       try {

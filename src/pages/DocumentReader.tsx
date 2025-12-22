@@ -251,7 +251,7 @@ const DocumentReader = () => {
                 </div>
                 <h3 className="font-semibold mb-2">Multiple Formats</h3>
                 <p className="text-sm text-muted-foreground">
-                  Support for PDF, Word, Text, Markdown, HTML, and RTF documents.
+                  Support for PDF, Word, EPUB, Text, Markdown, HTML, and RTF documents.
                 </p>
               </div>
             </div>
