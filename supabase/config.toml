@@ -1,1 +1,10 @@
 project_id = "rizjmpslqlcgqqpslsht"
+
+[functions.parse-document]
+verify_jwt = false
+
+[functions.define-word]
+verify_jwt = false
+
+[functions.search-summarize]
+verify_jwt = false
