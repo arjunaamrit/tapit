@@ -44,8 +44,9 @@ async function fetchUrlContent(url: string): Promise<{ url: string; title: strin
     const content = extractTextFromHtml(html);
     
     return { url, title, content };
-  } catch (error) {
-    console.log(`Error fetching ${url}:`, error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`Error fetching ${url}:`, errorMessage);
     return null;
   }
 }
