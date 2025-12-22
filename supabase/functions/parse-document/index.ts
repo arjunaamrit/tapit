@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import * as pdfjs from "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Initialize PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = '';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,7 +38,7 @@ serve(async (req) => {
     if (fileName.endsWith('.txt') || file.type === 'text/plain') {
       text = new TextDecoder().decode(uint8Array);
     } else if (fileName.endsWith('.pdf') || file.type === 'application/pdf') {
-      text = extractTextFromPDF(uint8Array);
+      text = await extractTextFromPDF(uint8Array);
     } else if (fileName.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       text = await extractTextFromDocx(arrayBuffer);
     } else {
@@ -67,16 +71,82 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error parsing document:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to parse document';
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to parse document' }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
-function extractTextFromPDF(data: Uint8Array): string {
+async function extractTextFromPDF(data: Uint8Array): Promise<string> {
+  try {
+    console.log('Starting PDF extraction with pdfjs-dist...');
+    
+    // Load the PDF document
+    const loadingTask = pdfjs.getDocument({
+      data: data,
+      useSystemFonts: true,
+      disableFontFace: true,
+    });
+    
+    const pdfDocument = await loadingTask.promise;
+    console.log('PDF loaded, pages:', pdfDocument.numPages);
+    
+    const textParts: string[] = [];
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      try {
+        const page = await pdfDocument.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Combine text items with proper spacing
+        let lastY: number | null = null;
+        let pageText = '';
+        
+        for (const item of textContent.items) {
+          if ('str' in item && item.str) {
+            // Check if we need a line break (Y position changed significantly)
+            if (lastY !== null && 'transform' in item) {
+              const currentY = item.transform[5];
+              if (Math.abs(currentY - lastY) > 5) {
+                pageText += '\n';
+              } else if (pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+                pageText += ' ';
+              }
+              lastY = currentY;
+            } else if ('transform' in item) {
+              lastY = item.transform[5];
+            }
+            
+            pageText += item.str;
+          }
+        }
+        
+        if (pageText.trim()) {
+          textParts.push(pageText.trim());
+        }
+      } catch (pageError) {
+        console.error(`Error extracting page ${pageNum}:`, pageError);
+      }
+    }
+    
+    const result = textParts.join('\n\n');
+    console.log('PDF extraction complete, text length:', result.length);
+    
+    return result;
+  } catch (error) {
+    console.error('Error in PDF extraction:', error);
+    // Fallback to basic extraction if pdfjs fails
+    return extractTextFromPDFFallback(data);
+  }
+}
+
+function extractTextFromPDFFallback(data: Uint8Array): string {
+  console.log('Using fallback PDF extraction...');
   const decoder = new TextDecoder('utf-8', { fatal: false });
   const content = decoder.decode(data);
   
@@ -102,15 +172,6 @@ function extractTextFromPDF(data: Uint8Array): string {
           textParts.push(item.slice(1, -1));
         });
       }
-    }
-  }
-  
-  const streamRegex = /stream\s*([\s\S]*?)\s*endstream/g;
-  while ((match = streamRegex.exec(content)) !== null) {
-    const streamContent = match[1];
-    const readableText = streamContent.replace(/[^\x20-\x7E\n\r\t]/g, ' ').trim();
-    if (readableText.length > 20 && /[a-zA-Z]{3,}/.test(readableText)) {
-      textParts.push(readableText);
     }
   }
   
