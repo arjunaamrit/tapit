@@ -1,15 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import * as pdfjs from "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.mjs";
+import { extractText } from "https://esm.sh/unpdf@0.12.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configure PDF.js for the Edge/Deno runtime.
-// Even when we disable workers, pdfjs-dist still expects workerSrc to be set.
-pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.mjs";
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -176,68 +173,20 @@ async function extractTextFromEpub(data: ArrayBuffer): Promise<string> {
 
 async function extractTextFromPDF(data: Uint8Array): Promise<string> {
   try {
-    console.log('Starting PDF extraction with pdfjs-dist...');
-
-    // Load the PDF document with worker disabled for Deno edge runtime
-    // (Types from esm build are slightly off, so we cast to any.)
-    const loadingTask = (pdfjs as any).getDocument({
-      data: data,
-      // Deno edge runtime: disable workers + avoid eval
-      disableWorker: true,
-      isEvalSupported: false,
-      // Font options that tend to behave better server-side
-      useSystemFonts: true,
-      disableFontFace: true,
-    } as any);
-
-    const pdfDocument = await loadingTask.promise;
-    console.log('PDF loaded, pages:', pdfDocument.numPages);
-
-    const textParts: string[] = [];
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      try {
-        const page = await pdfDocument.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        // Combine text items with proper spacing
-        let lastY: number | null = null;
-        let pageText = '';
-        
-        for (const item of textContent.items) {
-          if ('str' in item && item.str) {
-            // Check if we need a line break (Y position changed significantly)
-            if (lastY !== null && 'transform' in item) {
-              const currentY = item.transform[5];
-              if (Math.abs(currentY - lastY) > 5) {
-                pageText += '\n';
-              } else if (pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
-                pageText += ' ';
-              }
-              lastY = currentY;
-            } else if ('transform' in item) {
-              lastY = item.transform[5];
-            }
-            
-            pageText += item.str;
-          }
-        }
-        
-        if (pageText.trim()) {
-          textParts.push(pageText.trim());
-        }
-      } catch (pageError) {
-        console.error(`Error extracting page ${pageNum}:`, pageError);
-      }
-    }
+    console.log('Starting PDF extraction with unpdf...');
     
-    const result = textParts.join('\n\n');
-    console.log('PDF extraction complete, text length:', result.length);
+    // Use unpdf which is designed for serverless/edge environments
+    const result = await extractText(data, { mergePages: true });
     
-    return result;
+    const text = typeof result.text === 'string' 
+      ? result.text 
+      : (result.text as string[]).join('\n\n');
+    
+    console.log('PDF extraction complete, text length:', text.length);
+    return text.trim();
   } catch (error) {
-    console.error('Error in PDF extraction:', error);
-    // Fallback to basic extraction if pdfjs fails
+    console.error('Error in PDF extraction with unpdf:', error);
+    // Fallback to basic extraction if unpdf fails
     return extractTextFromPDFFallback(data);
   }
 }
