@@ -7,8 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Disable worker for Deno edge runtime - workers don't work in serverless
-pdfjs.GlobalWorkerOptions.workerSrc = "";
+// Configure PDF.js for the Edge/Deno runtime.
+// Even when we disable workers, pdfjs-dist still expects workerSrc to be set.
+pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.mjs";
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -178,13 +179,16 @@ async function extractTextFromPDF(data: Uint8Array): Promise<string> {
     console.log('Starting PDF extraction with pdfjs-dist...');
 
     // Load the PDF document with worker disabled for Deno edge runtime
-    const loadingTask = pdfjs.getDocument({
+    // (Types from esm build are slightly off, so we cast to any.)
+    const loadingTask = (pdfjs as any).getDocument({
       data: data,
+      // Deno edge runtime: disable workers + avoid eval
+      disableWorker: true,
+      isEvalSupported: false,
+      // Font options that tend to behave better server-side
       useSystemFonts: true,
       disableFontFace: true,
-      isEvalSupported: false,
-      useWorkerFetch: false,
-    });
+    } as any);
 
     const pdfDocument = await loadingTask.promise;
     console.log('PDF loaded, pages:', pdfDocument.numPages);
