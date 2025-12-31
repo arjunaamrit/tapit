@@ -11,22 +11,36 @@ import {
   Upload,
   Zap,
   Volume2,
-  ArrowRight
+  ArrowRight,
+  LogOut,
+  User,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useAnnotations } from "@/hooks/useAnnotations";
+import { useAuth } from "@/hooks/useAuth";
+import { useDocuments, useDocumentAnnotations } from "@/hooks/useDocuments";
 import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUploader";
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
 import { ReaderSidebar } from "@/components/reader/ReaderSidebar";
 import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const DocumentReader = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { saveDocument } = useDocuments();
+  
   const [documentText, setDocumentText] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [wordContext, setWordContext] = useState<string>("");
@@ -38,16 +52,43 @@ const DocumentReader = () => {
   const [lineHeight, setLineHeight] = useState(1.8);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // Use database annotations when user is logged in and document is saved
   const {
-    annotations,
-    addHighlight,
-    removeHighlight,
-    addNote,
-    removeNote,
-    addBookmark,
-    removeBookmark,
-    exportAnnotations,
-  } = useAnnotations();
+    highlights: dbHighlights,
+    notes: dbNotes,
+    bookmarks: dbBookmarks,
+    addHighlight: dbAddHighlight,
+    removeHighlight: dbRemoveHighlight,
+    addNote: dbAddNote,
+    removeNote: dbRemoveNote,
+    addBookmark: dbAddBookmark,
+    removeBookmark: dbRemoveBookmark,
+  } = useDocumentAnnotations(currentDocumentId);
+
+  // Convert DB annotations to the format expected by the viewer
+  const annotations = {
+    highlights: dbHighlights.map(h => ({
+      id: h.id,
+      text: h.text,
+      startOffset: h.start_offset,
+      endOffset: h.end_offset,
+      color: h.color as 'yellow' | 'green' | 'blue' | 'pink',
+      createdAt: new Date(h.created_at),
+    })),
+    notes: dbNotes.map(n => ({
+      id: n.id,
+      highlightId: n.highlight_id || undefined,
+      content: n.content,
+      position: n.position,
+      createdAt: new Date(n.created_at),
+    })),
+    bookmarks: dbBookmarks.map(b => ({
+      id: b.id,
+      paragraphIndex: b.paragraph_index,
+      label: b.label,
+      createdAt: new Date(b.created_at),
+    })),
+  };
 
   useEffect(() => {
     return () => {
@@ -95,11 +136,20 @@ const DocumentReader = () => {
     setIsPaused(false);
   };
 
-  const handleDocumentParsed = (text: string, name: string) => {
+  const handleDocumentParsed = async (text: string, name: string) => {
     setDocumentText(text);
     setFileName(name);
     setShowPopover(false);
     setSelectedWord(null);
+    
+    // Save document to database if user is logged in
+    if (user) {
+      const doc = await saveDocument(name, 'text', text);
+      if (doc) {
+        setCurrentDocumentId(doc.id);
+        toast({ title: "Document saved", description: "Your document has been saved to your account" });
+      }
+    }
   };
 
   const handleWordSelect = useCallback((word: string, context: string, rect: DOMRect) => {
@@ -123,12 +173,13 @@ const DocumentReader = () => {
     setIsPaused(false);
     setDocumentText("");
     setFileName("");
+    setCurrentDocumentId(null);
     setShowPopover(false);
     setSelectedWord(null);
   };
 
   const handleExportAnnotations = () => {
-    const data = exportAnnotations();
+    const data = JSON.stringify(annotations, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -138,6 +189,62 @@ const DocumentReader = () => {
     URL.revokeObjectURL(url);
     toast({ title: "Exported", description: "Annotations exported successfully" });
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  // Wrapper functions for annotations
+  const handleAddHighlight = async (text: string, startOffset: number, endOffset: number, color: 'yellow' | 'green' | 'blue' | 'pink' = 'yellow') => {
+    if (currentDocumentId) {
+      const result = await dbAddHighlight(text, startOffset, endOffset, color);
+      return result ? {
+        id: result.id,
+        text: result.text,
+        startOffset: result.start_offset,
+        endOffset: result.end_offset,
+        color: result.color as 'yellow' | 'green' | 'blue' | 'pink',
+        createdAt: new Date(result.created_at),
+      } : null;
+    }
+    return null;
+  };
+
+  const handleAddNote = async (content: string, position: number, highlightId?: string) => {
+    if (currentDocumentId) {
+      const result = await dbAddNote(content, position, highlightId);
+      return result ? {
+        id: result.id,
+        highlightId: result.highlight_id || undefined,
+        content: result.content,
+        position: result.position,
+        createdAt: new Date(result.created_at),
+      } : null;
+    }
+    return null;
+  };
+
+  const handleAddBookmark = async (paragraphIndex: number, label: string = '') => {
+    if (currentDocumentId) {
+      const result = await dbAddBookmark(paragraphIndex, label || `Bookmark ${annotations.bookmarks.length + 1}`);
+      return result ? {
+        id: result.id,
+        paragraphIndex: result.paragraph_index,
+        label: result.label,
+        createdAt: new Date(result.created_at),
+      } : null;
+    }
+    return null;
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleJumpToBookmark = (paragraphIndex: number) => {
     const element = document.getElementById(`paragraph-${paragraphIndex}`);
@@ -212,6 +319,28 @@ const DocumentReader = () => {
                     <span className="hidden sm:inline">New Document</span>
                   </Button>
                 </>
+              )}
+              
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="hidden sm:inline">{user.email?.split('@')[0]}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleSignOut} className="gap-2 cursor-pointer">
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => navigate('/auth')} className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </Button>
               )}
             </div>
           </div>
@@ -391,9 +520,9 @@ const DocumentReader = () => {
             annotations={annotations}
             onJumpToBookmark={handleJumpToBookmark}
             onJumpToHighlight={handleJumpToHighlight}
-            onRemoveBookmark={removeBookmark}
-            onRemoveHighlight={removeHighlight}
-            onRemoveNote={removeNote}
+            onRemoveBookmark={dbRemoveBookmark}
+            onRemoveHighlight={dbRemoveHighlight}
+            onRemoveNote={dbRemoveNote}
             fileName={fileName}
           />
 
@@ -411,9 +540,9 @@ const DocumentReader = () => {
                 text={documentText} 
                 annotations={annotations}
                 onWordSelect={handleWordSelect}
-                onAddHighlight={addHighlight}
-                onAddNote={addNote}
-                onAddBookmark={addBookmark}
+                onAddHighlight={handleAddHighlight}
+                onAddNote={handleAddNote}
+                onAddBookmark={handleAddBookmark}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
               />
