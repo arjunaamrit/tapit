@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { X, Loader2, Volume2, Search, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Loader2, Volume2, Search, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -204,7 +204,6 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
     const fetchDefinition = async () => {
@@ -257,7 +256,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   // Calculate position to keep popover in viewport
   const calculatePosition = () => {
     const popoverWidth = 400;
-    const popoverHeight = showSearch && searchResult ? 500 : nestedWord ? 380 : 320;
+    const popoverHeight = searchResult ? 500 : nestedWord ? 380 : 320;
     const padding = 16;
     
     let x = position.x - popoverWidth / 2;
@@ -306,7 +305,6 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
 
     setIsSearching(true);
     setSearchResult(null);
-    setShowSearch(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('search-summarize', {
@@ -413,83 +411,67 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
             <div className="border-t border-border my-3" />
 
             {/* AI Search Section */}
-            <div>
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className="flex items-center justify-between w-full text-sm font-medium text-foreground hover:text-primary transition-colors mb-3"
-              >
-                <span className="flex items-center gap-2">
-                  <Search className="h-4 w-4 text-primary" />
-                  AI-Powered Search
-                </span>
-                {showSearch ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </button>
-
-              {showSearch && (
-                <div className="space-y-3">
-                  <form onSubmit={handleSearch} className="flex gap-2">
-                    <Input
-                      type="text"
-                      placeholder="Search for more info..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="flex-1 h-9 text-sm"
-                      disabled={isSearching}
-                    />
-                    <Button 
-                      type="submit" 
-                      disabled={isSearching}
-                      size="sm"
-                      className="h-9"
-                    >
-                      {isSearching ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Search className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </form>
-
-                  {isSearching && (
-                    <div className="text-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
-                      <p className="mt-2 text-xs text-muted-foreground">Searching...</p>
-                    </div>
+            <div className="space-y-3">
+              <form onSubmit={handleSearch} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search for more info..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9 text-sm"
+                    disabled={isSearching}
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={isSearching || !searchQuery.trim()}
+                  size="sm"
+                  className="h-9"
+                >
+                  {isSearching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Search"
                   )}
+                </Button>
+              </form>
 
-                  {searchResult && !isSearching && (
-                    <div className="space-y-3">
-                      <div className="bg-muted/50 p-3 rounded-lg">
-                        <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                          <ClickableText text={searchResult.summary} onWordClick={handleNestedWordClick} />
-                        </p>
+              {isSearching && (
+                <div className="text-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Searching...</p>
+                </div>
+              )}
+
+              {searchResult && !isSearching && (
+                <div className="space-y-3">
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                      <ClickableText text={searchResult.summary} onWordClick={handleNestedWordClick} />
+                    </p>
+                  </div>
+
+                  {searchResult.sources && searchResult.sources.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Sources</p>
+                      <div className="space-y-1">
+                        {searchResult.sources.slice(0, 3).map((source, index) => (
+                          <a
+                            key={index}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-2 bg-background rounded hover:bg-muted transition-colors group"
+                          >
+                            <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary flex-shrink-0" />
+                            <span className="text-xs text-muted-foreground group-hover:text-primary truncate">
+                              {source.title}
+                            </span>
+                          </a>
+                        ))}
                       </div>
-
-                      {searchResult.sources && searchResult.sources.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Sources</p>
-                          <div className="space-y-1">
-                            {searchResult.sources.slice(0, 3).map((source, index) => (
-                              <a
-                                key={index}
-                                href={source.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-2 bg-background rounded hover:bg-muted transition-colors group"
-                              >
-                                <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary flex-shrink-0" />
-                                <span className="text-xs text-muted-foreground group-hover:text-primary truncate">
-                                  {source.title}
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
