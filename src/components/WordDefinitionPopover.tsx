@@ -1,10 +1,39 @@
 import { useEffect, useState, useCallback } from "react";
-import { X, Loader2, Volume2, Search, ExternalLink } from "lucide-react";
+import { X, Loader2, Volume2, Search, ExternalLink, Languages, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const LANGUAGES = [
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "zh", name: "Chinese" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "ar", name: "Arabic" },
+  { code: "hi", name: "Hindi" },
+  { code: "bn", name: "Bengali" },
+  { code: "tr", name: "Turkish" },
+  { code: "vi", name: "Vietnamese" },
+  { code: "th", name: "Thai" },
+  { code: "nl", name: "Dutch" },
+  { code: "pl", name: "Polish" },
+  { code: "sv", name: "Swedish" },
+  { code: "id", name: "Indonesian" },
+  { code: "ms", name: "Malay" },
+];
 
 interface Source {
   url: string;
@@ -204,6 +233,11 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  
+  // Translation state
+  const [translation, setTranslation] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDefinition = async () => {
@@ -292,6 +326,32 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     }
   };
 
+  const handleTranslate = async (langCode: string, langName: string) => {
+    setIsTranslating(true);
+    setSelectedLanguage(langName);
+    setTranslation(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('translate-word', {
+        body: { word, targetLanguage: langCode, targetLanguageName: langName }
+      });
+
+      if (error) throw error;
+      
+      setTranslation(data.translation);
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast({
+        title: "Translation failed",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+      setSelectedLanguage(null);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
@@ -361,9 +421,41 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
                   size="sm"
                   className="h-7 w-7 p-0"
                   onClick={handleSpeak}
+                  title="Listen to pronunciation"
                 >
                   <Volume2 className="h-4 w-4" />
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2"
+                      disabled={isTranslating}
+                      title="Translate to another language"
+                    >
+                      {isTranslating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Languages className="h-4 w-4" />
+                          <ChevronDown className="h-3 w-3" />
+                        </>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">
+                    {LANGUAGES.map((lang) => (
+                      <DropdownMenuItem
+                        key={lang.code}
+                        onClick={() => handleTranslate(lang.code, lang.name)}
+                        className="cursor-pointer"
+                      >
+                        {lang.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <Button
                 variant="ghost"
@@ -374,6 +466,24 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
                 <X className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Translation Result */}
+            {(translation || isTranslating) && selectedLanguage && (
+              <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Languages className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium text-primary">{selectedLanguage}</span>
+                </div>
+                {isTranslating ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Translating...</span>
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium">{translation}</p>
+                )}
+              </div>
+            )}
             
             {/* Definition Content */}
             <div className="min-h-[60px] mb-4">
