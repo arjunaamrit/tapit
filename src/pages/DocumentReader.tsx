@@ -178,18 +178,6 @@ const DocumentReader = () => {
     setSelectedWord(null);
   };
 
-  const handleExportAnnotations = () => {
-    const data = JSON.stringify(annotations, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileName.replace(/\.[^/.]+$/, '')}-annotations.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "Annotations exported successfully" });
-  };
-
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
@@ -312,7 +300,9 @@ const DocumentReader = () => {
                     onFontSizeChange={setFontSize}
                     lineHeight={lineHeight}
                     onLineHeightChange={setLineHeight}
-                    onExportAnnotations={handleExportAnnotations}
+                    fileName={fileName}
+                    documentText={documentText}
+                    annotations={annotations}
                   />
                   <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-2">
                     <X className="h-4 w-4" />

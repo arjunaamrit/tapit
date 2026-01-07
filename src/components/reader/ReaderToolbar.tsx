@@ -5,12 +5,11 @@ import {
   ZoomIn, 
   ZoomOut,
   Type,
-  Sun,
-  Moon,
-  Download,
   Settings,
-  AlignLeft
+  AlignLeft,
+  Share2
 } from 'lucide-react';
+import { ExportShareDialog } from './ExportShareDialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -31,7 +30,31 @@ interface ReaderToolbarProps {
   onFontSizeChange: (size: number) => void;
   lineHeight: number;
   onLineHeightChange: (height: number) => void;
-  onExportAnnotations: () => void;
+  fileName: string;
+  documentText: string;
+  annotations: {
+    highlights: Array<{
+      id: string;
+      text: string;
+      startOffset: number;
+      endOffset: number;
+      color: string;
+      createdAt: Date;
+    }>;
+    notes: Array<{
+      id: string;
+      highlightId?: string;
+      content: string;
+      position: number;
+      createdAt: Date;
+    }>;
+    bookmarks: Array<{
+      id: string;
+      paragraphIndex: number;
+      label: string;
+      createdAt: Date;
+    }>;
+  };
 }
 
 export const ReaderToolbar = ({
@@ -44,7 +67,9 @@ export const ReaderToolbar = ({
   onFontSizeChange,
   lineHeight,
   onLineHeightChange,
-  onExportAnnotations,
+  fileName,
+  documentText,
+  annotations,
 }: ReaderToolbarProps) => {
   return (
     <div className="flex items-center gap-2 p-2 glass-panel rounded-xl">
@@ -170,16 +195,22 @@ export const ReaderToolbar = ({
 
       <Separator orientation="vertical" className="h-6" />
 
-      {/* Export */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onExportAnnotations}
-        className="toolbar-button"
-        title="Export annotations"
-      >
-        <Download className="h-4 w-4" />
-      </Button>
+      {/* Export & Share */}
+      <ExportShareDialog
+        fileName={fileName}
+        documentText={documentText}
+        annotations={annotations}
+        trigger={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="toolbar-button"
+            title="Export & Share"
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
+        }
+      />
     </div>
   );
 };
