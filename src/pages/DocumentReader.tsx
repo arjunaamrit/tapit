@@ -50,6 +50,8 @@ const DocumentReader = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.8);
+  const [speechRate, setSpeechRate] = useState(1);
+  const [selectedVoice, setSelectedVoice] = useState(0);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Use database annotations when user is logged in and document is saved
@@ -107,8 +109,14 @@ const DocumentReader = () => {
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(documentText);
-    utterance.rate = 1;
+    utterance.rate = speechRate;
     utterance.pitch = 1;
+    
+    // Set voice if available
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0 && selectedVoice < voices.length) {
+      utterance.voice = voices[selectedVoice];
+    }
     
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
@@ -303,6 +311,10 @@ const DocumentReader = () => {
                     fileName={fileName}
                     documentText={documentText}
                     annotations={annotations}
+                    speechRate={speechRate}
+                    onSpeechRateChange={setSpeechRate}
+                    selectedVoice={selectedVoice}
+                    onVoiceChange={setSelectedVoice}
                   />
                   <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-2">
                     <X className="h-4 w-4" />
