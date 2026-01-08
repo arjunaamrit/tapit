@@ -9,6 +9,7 @@ export interface Document {
   file_type: string;
   file_size: number | null;
   content: string | null;
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,11 +128,36 @@ export const useDocuments = () => {
     }
   };
 
+  const updateDocumentFolder = async (documentId: string, folderId: string | null) => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .update({ folder_id: folderId })
+        .eq('id', documentId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setDocuments(prev => prev.map(d => d.id === documentId ? data : d));
+      return data;
+    } catch (error: any) {
+      console.error('Error updating document folder:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to move document',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
   return {
     documents,
     loading,
     saveDocument,
     deleteDocument,
+    updateDocumentFolder,
     refetch: fetchDocuments,
   };
 };

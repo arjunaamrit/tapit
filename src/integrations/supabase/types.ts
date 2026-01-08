@@ -49,6 +49,42 @@ export type Database = {
           },
         ]
       }
+      document_tags: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_tags_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content: string | null
@@ -56,6 +92,7 @@ export type Database = {
           file_name: string
           file_size: number | null
           file_type: string
+          folder_id: string | null
           id: string
           updated_at: string
           user_id: string
@@ -66,6 +103,7 @@ export type Database = {
           file_name: string
           file_size?: number | null
           file_type: string
+          folder_id?: string | null
           id?: string
           updated_at?: string
           user_id: string
@@ -76,11 +114,58 @@ export type Database = {
           file_name?: string
           file_size?: number | null
           file_type?: string
+          folder_id?: string | null
           id?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "documents_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       highlights: {
         Row: {
@@ -191,6 +276,30 @@ export type Database = {
           email?: string | null
           id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
           user_id?: string
         }
         Relationships: []
