@@ -24,6 +24,7 @@ import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUpload
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
 import { ReaderSidebar } from "@/components/reader/ReaderSidebar";
 import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
+import { DocumentOrganizer } from "@/components/reader/DocumentOrganizer";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import {
   DropdownMenu,
@@ -36,7 +37,8 @@ const DocumentReader = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
-  const { saveDocument } = useDocuments();
+  const { saveDocument, updateDocumentFolder, documents } = useDocuments();
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   
   const [documentText, setDocumentText] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
@@ -155,6 +157,7 @@ const DocumentReader = () => {
       const doc = await saveDocument(name, 'text', text);
       if (doc) {
         setCurrentDocumentId(doc.id);
+        setCurrentFolderId(doc.folder_id);
         toast({ title: "Document saved", description: "Your document has been saved to your account" });
       }
     }
@@ -531,6 +534,22 @@ const DocumentReader = () => {
           {/* Main Content */}
           <main className="flex-1 overflow-auto p-6 md:p-8">
             <div className="max-w-3xl mx-auto">
+              {/* Document Organization */}
+              {user && currentDocumentId && (
+                <div className="mb-4">
+                  <DocumentOrganizer
+                    documentId={currentDocumentId}
+                    currentFolderId={currentFolderId}
+                    onFolderChange={async (folderId) => {
+                      setCurrentFolderId(folderId);
+                      if (currentDocumentId) {
+                        await updateDocumentFolder(currentDocumentId, folderId);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
               <div className="flex items-center justify-center gap-4 mb-6">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-sm text-muted-foreground">
                   <MousePointer2 className="h-4 w-4" />
