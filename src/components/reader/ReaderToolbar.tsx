@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   Volume2, 
   Pause, 
@@ -7,7 +8,8 @@ import {
   Type,
   Settings,
   AlignLeft,
-  Share2
+  Share2,
+  Mic
 } from 'lucide-react';
 import { ExportShareDialog } from './ExportShareDialog';
 import { Button } from '@/components/ui/button';
@@ -19,11 +21,18 @@ import {
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ReaderToolbarProps {
   isSpeaking: boolean;
   isPaused: boolean;
-  onSpeak: () => void;
+  onSpeak: (rate?: number, voiceIndex?: number) => void;
   onPause: () => void;
   onStop: () => void;
   fontSize: number;
@@ -55,6 +64,10 @@ interface ReaderToolbarProps {
       createdAt: Date;
     }>;
   };
+  speechRate?: number;
+  onSpeechRateChange?: (rate: number) => void;
+  selectedVoice?: number;
+  onVoiceChange?: (voiceIndex: number) => void;
 }
 
 export const ReaderToolbar = ({
@@ -70,7 +83,30 @@ export const ReaderToolbar = ({
   fileName,
   documentText,
   annotations,
+  speechRate = 1,
+  onSpeechRateChange,
+  selectedVoice = 0,
+  onVoiceChange,
 }: ReaderToolbarProps) => {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const availableVoices = window.speechSynthesis.getVoices();
+      setVoices(availableVoices);
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  const handleSpeak = () => onSpeak();
+  const handleResume = () => onSpeak();
+
   return (
     <div className="flex items-center gap-2 p-2 glass-panel rounded-xl">
       {/* Text-to-Speech Controls */}
@@ -79,7 +115,7 @@ export const ReaderToolbar = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onSpeak}
+            onClick={handleSpeak}
             className="toolbar-button"
             title="Listen"
           >
@@ -90,7 +126,7 @@ export const ReaderToolbar = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={isPaused ? onSpeak : onPause}
+              onClick={isPaused ? handleResume : onPause}
               className="toolbar-button"
               title={isPaused ? 'Resume' : 'Pause'}
             >
@@ -154,7 +190,7 @@ export const ReaderToolbar = ({
             <Settings className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72">
+        <PopoverContent className="w-80">
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -189,6 +225,49 @@ export const ReaderToolbar = ({
                 step={1}
               />
             </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4" />
+                  Speech Rate
+                </Label>
+                <span className="text-sm text-muted-foreground">{speechRate.toFixed(1)}x</span>
+              </div>
+              <Slider
+                value={[speechRate * 10]}
+                onValueChange={([value]) => onSpeechRateChange?.(value / 10)}
+                min={5}
+                max={20}
+                step={1}
+              />
+            </div>
+
+            {voices.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Mic className="h-4 w-4" />
+                  Voice
+                </Label>
+                <Select
+                  value={selectedVoice.toString()}
+                  onValueChange={(value) => onVoiceChange?.(parseInt(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select voice" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {voices.map((voice, index) => (
+                      <SelectItem key={`${voice.name}-${index}`} value={index.toString()}>
+                        {voice.name} ({voice.lang})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>
