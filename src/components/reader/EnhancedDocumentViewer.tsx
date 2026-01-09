@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { NoteDialog } from './NoteDialog';
 import { HighlightColor, Highlight, AnnotationState } from '@/hooks/useAnnotations';
+import { SearchMatch } from '@/hooks/useInDocumentSearch';
 import { cn } from '@/lib/utils';
 
 interface EnhancedDocumentViewerProps {
@@ -13,6 +14,8 @@ interface EnhancedDocumentViewerProps {
   onAddBookmark: (paragraphIndex: number, label: string) => void;
   fontSize: number;
   lineHeight: number;
+  searchMatches?: SearchMatch[];
+  currentSearchMatchIndex?: number;
 }
 
 const highlightColorClasses: Record<HighlightColor, string> = {
@@ -31,6 +34,8 @@ export const EnhancedDocumentViewer = ({
   onAddBookmark,
   fontSize,
   lineHeight,
+  searchMatches = [],
+  currentSearchMatchIndex = 0,
 }: EnhancedDocumentViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showToolbar, setShowToolbar] = useState(false);
@@ -169,9 +174,114 @@ export const EnhancedDocumentViewer = ({
     window.getSelection()?.removeAllRanges();
   }, []);
 
+  // Calculate paragraph offsets for search highlighting
+  const paragraphOffsets = useCallback(() => {
+    const offsets: { start: number; end: number }[] = [];
+    let currentOffset = 0;
+    const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+    
+    paragraphs.forEach((p, i) => {
+      offsets.push({
+        start: currentOffset,
+        end: currentOffset + p.length,
+      });
+      // Add the separator length (assuming \n\n)
+      currentOffset += p.length + (i < paragraphs.length - 1 ? 2 : 0);
+    });
+    
+    return offsets;
+  }, [text]);
+
+  // Render text with search highlights
+  const renderTextWithSearchHighlights = (textContent: string, paragraphStartOffset: number) => {
+    if (searchMatches.length === 0) {
+      return textContent.split('\n').map((line, lineIndex, arr) => (
+        <span key={lineIndex}>
+          {line}
+          {lineIndex < arr.length - 1 && <br />}
+        </span>
+      ));
+    }
+
+    const paragraphEndOffset = paragraphStartOffset + textContent.length;
+    const relevantMatches = searchMatches.filter(
+      (m) => m.startOffset < paragraphEndOffset && m.endOffset > paragraphStartOffset
+    );
+
+    if (relevantMatches.length === 0) {
+      return textContent.split('\n').map((line, lineIndex, arr) => (
+        <span key={lineIndex}>
+          {line}
+          {lineIndex < arr.length - 1 && <br />}
+        </span>
+      ));
+    }
+
+    const segments: { text: string; isMatch: boolean; isCurrent: boolean }[] = [];
+    let lastEnd = 0;
+
+    relevantMatches.forEach((match) => {
+      const localStart = Math.max(0, match.startOffset - paragraphStartOffset);
+      const localEnd = Math.min(textContent.length, match.endOffset - paragraphStartOffset);
+
+      if (localStart > lastEnd) {
+        segments.push({ text: textContent.slice(lastEnd, localStart), isMatch: false, isCurrent: false });
+      }
+
+      segments.push({
+        text: textContent.slice(localStart, localEnd),
+        isMatch: true,
+        isCurrent: match.index === currentSearchMatchIndex,
+      });
+
+      lastEnd = localEnd;
+    });
+
+    if (lastEnd < textContent.length) {
+      segments.push({ text: textContent.slice(lastEnd), isMatch: false, isCurrent: false });
+    }
+
+    return segments.map((segment, i) => {
+      if (segment.isMatch) {
+        return (
+          <mark
+            key={i}
+            id={segment.isCurrent ? 'current-search-match' : undefined}
+            className={cn(
+              'rounded px-0.5 transition-colors',
+              segment.isCurrent
+                ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
+                : 'bg-accent/50 text-foreground'
+            )}
+          >
+            {segment.text}
+          </mark>
+        );
+      }
+      return segment.text.split('\n').map((line, lineIndex, arr) => (
+        <span key={`${i}-${lineIndex}`}>
+          {line}
+          {lineIndex < arr.length - 1 && <br />}
+        </span>
+      ));
+    });
+  };
+
+  // Scroll to current match
+  useEffect(() => {
+    if (searchMatches.length > 0) {
+      const currentMatchEl = document.getElementById('current-search-match');
+      if (currentMatchEl) {
+        currentMatchEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentSearchMatchIndex, searchMatches.length]);
+
   // Apply highlights to text
   const renderParagraphWithHighlights = (paragraph: string, paragraphIndex: number) => {
-    // For now, render plain text with potential to add highlight markers
+    const offsets = paragraphOffsets();
+    const paragraphStartOffset = offsets[paragraphIndex]?.start ?? 0;
+    
     const isBookmarked = annotations.bookmarks.some(
       b => b.paragraphIndex === paragraphIndex
     );
@@ -187,12 +297,7 @@ export const EnhancedDocumentViewer = ({
         style={{ fontSize: `${fontSize}px`, lineHeight }}
         onMouseEnter={() => setCurrentParagraphIndex(paragraphIndex)}
       >
-        {paragraph.split('\n').map((line, lineIndex) => (
-          <span key={lineIndex}>
-            {line}
-            {lineIndex < paragraph.split('\n').length - 1 && <br />}
-          </span>
-        ))}
+        {renderTextWithSearchHighlights(paragraph, paragraphStartOffset)}
       </p>
     );
   };

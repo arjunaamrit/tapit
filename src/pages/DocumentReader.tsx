@@ -14,18 +14,21 @@ import {
   ArrowRight,
   LogOut,
   User,
-  Loader2
+  Loader2,
+  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useDocuments, useDocumentAnnotations, Document } from "@/hooks/useDocuments";
+import { useInDocumentSearch } from "@/hooks/useInDocumentSearch";
 import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUploader";
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
 import { ReaderSidebar } from "@/components/reader/ReaderSidebar";
 import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
 import { DocumentOrganizer } from "@/components/reader/DocumentOrganizer";
 import { DocumentLibraryDialog } from "@/components/reader/DocumentLibraryDialog";
+import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import {
   DropdownMenu,
@@ -57,6 +60,18 @@ const DocumentReader = () => {
   const [selectedVoice, setSelectedVoice] = useState(0);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // In-document search
+  const {
+    searchQuery: inDocSearchQuery,
+    setSearchQuery: setInDocSearchQuery,
+    matches: searchMatches,
+    currentMatchIndex: currentSearchMatchIndex,
+    goToNextMatch,
+    goToPreviousMatch,
+    isSearchOpen,
+    openSearch,
+    closeSearch,
+  } = useInDocumentSearch(documentText);
   // Use database annotations when user is logged in and document is saved
   const {
     highlights: dbHighlights,
@@ -100,6 +115,19 @@ const DocumentReader = () => {
       window.speechSynthesis.cancel();
     };
   }, []);
+
+  // Keyboard shortcut for search (Ctrl/Cmd + F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && documentText) {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [documentText, openSearch]);
 
   const handleSpeak = () => {
     if (!documentText) return;
@@ -324,32 +352,42 @@ const DocumentReader = () => {
                   onDeleteDocument={handleDeleteDocumentFromLibrary}
                 />
               )}
-              {documentText && (
-                <>
-                  <ReaderToolbar
-                    isSpeaking={isSpeaking}
-                    isPaused={isPaused}
-                    onSpeak={handleSpeak}
-                    onPause={handlePause}
-                    onStop={handleStop}
-                    fontSize={fontSize}
-                    onFontSizeChange={setFontSize}
-                    lineHeight={lineHeight}
-                    onLineHeightChange={setLineHeight}
-                    fileName={fileName}
-                    documentText={documentText}
-                    annotations={annotations}
-                    speechRate={speechRate}
-                    onSpeechRateChange={setSpeechRate}
-                    selectedVoice={selectedVoice}
-                    onVoiceChange={setSelectedVoice}
-                  />
-                  <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-2">
-                    <X className="h-4 w-4" />
-                    <span className="hidden sm:inline">New Document</span>
-                  </Button>
-                </>
-              )}
+                  {documentText && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openSearch}
+                        className="gap-2"
+                        title="Search in document (Ctrl+F)"
+                      >
+                        <Search className="h-4 w-4" />
+                        <span className="hidden sm:inline">Find</span>
+                      </Button>
+                      <ReaderToolbar
+                        isSpeaking={isSpeaking}
+                        isPaused={isPaused}
+                        onSpeak={handleSpeak}
+                        onPause={handlePause}
+                        onStop={handleStop}
+                        fontSize={fontSize}
+                        onFontSizeChange={setFontSize}
+                        lineHeight={lineHeight}
+                        onLineHeightChange={setLineHeight}
+                        fileName={fileName}
+                        documentText={documentText}
+                        annotations={annotations}
+                        speechRate={speechRate}
+                        onSpeechRateChange={setSpeechRate}
+                        selectedVoice={selectedVoice}
+                        onVoiceChange={setSelectedVoice}
+                      />
+                      <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-2">
+                        <X className="h-4 w-4" />
+                        <span className="hidden sm:inline">New Document</span>
+                      </Button>
+                    </>
+                  )}
               
               {user ? (
                 <DropdownMenu>
@@ -591,11 +629,25 @@ const DocumentReader = () => {
                 onAddBookmark={handleAddBookmark}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
+                searchMatches={searchMatches}
+                currentSearchMatchIndex={currentSearchMatchIndex}
               />
             </div>
           </main>
         </div>
       )}
+
+      {/* In-document search panel */}
+      <InDocumentSearch
+        isOpen={isSearchOpen}
+        searchQuery={inDocSearchQuery}
+        onSearchChange={setInDocSearchQuery}
+        matchCount={searchMatches.length}
+        currentMatchIndex={currentSearchMatchIndex}
+        onNextMatch={goToNextMatch}
+        onPreviousMatch={goToPreviousMatch}
+        onClose={closeSearch}
+      />
 
       {showPopover && selectedWord && (
         <WordDefinitionPopover
