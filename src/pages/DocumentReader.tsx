@@ -19,12 +19,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useDocuments, useDocumentAnnotations } from "@/hooks/useDocuments";
+import { useDocuments, useDocumentAnnotations, Document } from "@/hooks/useDocuments";
 import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUploader";
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
 import { ReaderSidebar } from "@/components/reader/ReaderSidebar";
 import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
 import { DocumentOrganizer } from "@/components/reader/DocumentOrganizer";
+import { DocumentLibraryDialog } from "@/components/reader/DocumentLibraryDialog";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import {
   DropdownMenu,
@@ -37,7 +38,7 @@ const DocumentReader = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
-  const { saveDocument, updateDocumentFolder, documents } = useDocuments();
+  const { saveDocument, updateDocumentFolder, documents, deleteDocument } = useDocuments();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   
   const [documentText, setDocumentText] = useState<string>("");
@@ -189,6 +190,22 @@ const DocumentReader = () => {
     setSelectedWord(null);
   };
 
+  const handleSelectDocumentFromLibrary = (doc: Document) => {
+    if (doc.content) {
+      setDocumentText(doc.content);
+      setFileName(doc.file_name);
+      setCurrentDocumentId(doc.id);
+      setCurrentFolderId(doc.folder_id);
+    }
+  };
+
+  const handleDeleteDocumentFromLibrary = async (id: string) => {
+    const success = await deleteDocument(id);
+    if (success && currentDocumentId === id) {
+      handleClearDocument();
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
@@ -299,6 +316,14 @@ const DocumentReader = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {user && documents.length > 0 && (
+                <DocumentLibraryDialog
+                  documents={documents}
+                  currentDocumentId={currentDocumentId}
+                  onSelectDocument={handleSelectDocumentFromLibrary}
+                  onDeleteDocument={handleDeleteDocumentFromLibrary}
+                />
+              )}
               {documentText && (
                 <>
                   <ReaderToolbar
