@@ -15,7 +15,8 @@ import {
   LogOut,
   User,
   Loader2,
-  Search
+  Search,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
 import { DocumentOrganizer } from "@/components/reader/DocumentOrganizer";
 import { DocumentLibraryDialog } from "@/components/reader/DocumentLibraryDialog";
 import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
+import { DocumentChat } from "@/components/reader/DocumentChat";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import {
   DropdownMenu,
@@ -72,6 +74,9 @@ const DocumentReader = () => {
     openSearch,
     closeSearch,
   } = useInDocumentSearch(documentText);
+
+  // Document chat
+  const [isChatOpen, setIsChatOpen] = useState(false);
   // Use database annotations when user is logged in and document is saved
   const {
     highlights: dbHighlights,
@@ -354,6 +359,16 @@ const DocumentReader = () => {
               )}
                   {documentText && (
                     <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsChatOpen(true)}
+                        className="gap-2"
+                        title="Ask questions about this document"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="hidden sm:inline">Ask</span>
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -657,6 +672,14 @@ const DocumentReader = () => {
           onClose={handleClosePopover}
         />
       )}
+
+      {/* Document Chat */}
+      <DocumentChat
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        documentContent={documentText}
+        documentName={fileName}
+      />
     </div>
   );
 };
