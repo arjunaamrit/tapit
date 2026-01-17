@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useDocuments, useDocumentAnnotations, Document } from "@/hooks/useDocuments";
+import { useLocalDocuments, LocalDocument } from "@/hooks/useLocalDocuments";
 import { useInDocumentSearch } from "@/hooks/useInDocumentSearch";
 import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUploader";
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
@@ -44,7 +45,9 @@ const DocumentReader = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { saveDocument, updateDocumentFolder, documents, deleteDocument } = useDocuments();
+  const { documents: localDocuments, addDocument: addLocalDocument, removeDocument: removeLocalDocument } = useLocalDocuments();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentLocalDocId, setCurrentLocalDocId] = useState<string | null>(null);
   
   const [documentText, setDocumentText] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
@@ -186,14 +189,21 @@ const DocumentReader = () => {
     setShowPopover(false);
     setSelectedWord(null);
     
-    // Save document to database if user is logged in
+    // Save document to database if user is logged in, otherwise save locally
     if (user) {
       const doc = await saveDocument(name, 'text', text);
       if (doc) {
         setCurrentDocumentId(doc.id);
+        setCurrentLocalDocId(null);
         setCurrentFolderId(doc.folder_id);
         toast({ title: "Document saved", description: "Your document has been saved to your account" });
       }
+    } else {
+      // Save to local storage for non-logged-in users
+      const localDoc = addLocalDocument(name, text);
+      setCurrentLocalDocId(localDoc.id);
+      setCurrentDocumentId(null);
+      toast({ title: "Document loaded", description: "Sign in to sync your documents across devices" });
     }
   };
 
@@ -219,6 +229,7 @@ const DocumentReader = () => {
     setDocumentText("");
     setFileName("");
     setCurrentDocumentId(null);
+    setCurrentLocalDocId(null);
     setShowPopover(false);
     setSelectedWord(null);
   };
@@ -228,13 +239,37 @@ const DocumentReader = () => {
       setDocumentText(doc.content);
       setFileName(doc.file_name);
       setCurrentDocumentId(doc.id);
+      setCurrentLocalDocId(null);
       setCurrentFolderId(doc.folder_id);
+    }
+  };
+
+  const handleSelectLocalDocument = (doc: LocalDocument) => {
+    setDocumentText(doc.content);
+    setFileName(doc.file_name);
+    setCurrentLocalDocId(doc.id);
+    setCurrentDocumentId(null);
+    setCurrentFolderId(null);
+  };
+
+  const handleSelectAnyDocument = (doc: LocalDocument | Document) => {
+    if ('folder_id' in doc) {
+      handleSelectDocumentFromLibrary(doc as Document);
+    } else {
+      handleSelectLocalDocument(doc as LocalDocument);
     }
   };
 
   const handleDeleteDocumentFromLibrary = async (id: string) => {
     const success = await deleteDocument(id);
     if (success && currentDocumentId === id) {
+      handleClearDocument();
+    }
+  };
+
+  const handleDeleteLocalDocument = (id: string) => {
+    removeLocalDocument(id);
+    if (currentLocalDocId === id) {
       handleClearDocument();
     }
   };
@@ -607,6 +642,12 @@ const DocumentReader = () => {
             onRemoveHighlight={dbRemoveHighlight}
             onRemoveNote={dbRemoveNote}
             fileName={fileName}
+            localDocuments={localDocuments}
+            cloudDocuments={documents}
+            currentDocumentId={currentDocumentId || currentLocalDocId}
+            onSelectDocument={handleSelectAnyDocument}
+            onDeleteLocalDocument={handleDeleteLocalDocument}
+            isLoggedIn={!!user}
           />
 
           {/* Main Content */}
