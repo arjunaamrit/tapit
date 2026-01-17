@@ -47,10 +47,10 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
       });
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 100 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please upload a file smaller than 10MB.",
+        description: "Please upload a file smaller than 100MB.",
         variant: "destructive",
       });
       return;
@@ -251,7 +251,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              Maximum file size: 10MB
+              Maximum file size: 100MB
             </p>
           </div>
         </>

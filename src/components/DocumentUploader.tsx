@@ -32,10 +32,10 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 100 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please upload a file smaller than 10MB.",
+        description: "Please upload a file smaller than 100MB.",
         variant: "destructive",
       });
       return;
@@ -158,7 +158,7 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
           </label>
           
           <p className="text-xs text-muted-foreground mt-4">
-            Supports PDF, DOCX, and TXT files up to 10MB
+            Supports PDF, DOCX, and TXT files up to 100MB
           </p>
         </>
       )}
