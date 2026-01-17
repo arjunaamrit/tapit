@@ -6,13 +6,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
-  FileText
+  FileText,
+  FolderOpen,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnnotationState, HighlightColor } from '@/hooks/useAnnotations';
 import { cn } from '@/lib/utils';
+import { LocalDocument } from '@/hooks/useLocalDocuments';
+import { Document } from '@/hooks/useDocuments';
 
 interface ReaderSidebarProps {
   annotations: AnnotationState;
@@ -22,6 +26,13 @@ interface ReaderSidebarProps {
   onRemoveHighlight: (id: string) => void;
   onRemoveNote: (id: string) => void;
   fileName: string;
+  // Document list props
+  localDocuments?: LocalDocument[];
+  cloudDocuments?: Document[];
+  currentDocumentId?: string | null;
+  onSelectDocument?: (doc: LocalDocument | Document) => void;
+  onDeleteLocalDocument?: (id: string) => void;
+  isLoggedIn?: boolean;
 }
 
 const highlightColorClasses: Record<HighlightColor, string> = {
@@ -39,8 +50,23 @@ export const ReaderSidebar = ({
   onRemoveHighlight,
   onRemoveNote,
   fileName,
+  localDocuments = [],
+  cloudDocuments = [],
+  currentDocumentId,
+  onSelectDocument,
+  onDeleteLocalDocument,
+  isLoggedIn = false,
 }: ReaderSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('documents');
+
+  const allDocuments = [...localDocuments, ...cloudDocuments];
+  const totalDocs = allDocuments.length;
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
 
   if (collapsed) {
     return (
@@ -54,6 +80,14 @@ export const ReaderSidebar = ({
           <ChevronRight className="h-4 w-4" />
         </Button>
         <div className="flex flex-col gap-4 items-center">
+          <div className="relative">
+            <FolderOpen className="h-5 w-5 text-sidebar-foreground/60" />
+            {totalDocs > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center">
+                {totalDocs}
+              </span>
+            )}
+          </div>
           <div className="relative">
             <Bookmark className="h-5 w-5 text-sidebar-foreground/60" />
             {annotations.bookmarks.length > 0 && (
@@ -100,8 +134,12 @@ export const ReaderSidebar = ({
         </Button>
       </div>
 
-      <Tabs defaultValue="bookmarks" className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 p-1 mx-2 mt-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-4 p-1 mx-2 mt-2">
+          <TabsTrigger value="documents" className="text-xs gap-1">
+            <FolderOpen className="h-3 w-3" />
+            <span className="hidden sm:inline">{totalDocs}</span>
+          </TabsTrigger>
           <TabsTrigger value="bookmarks" className="text-xs gap-1">
             <Bookmark className="h-3 w-3" />
             <span className="hidden sm:inline">{annotations.bookmarks.length}</span>
@@ -117,6 +155,89 @@ export const ReaderSidebar = ({
         </TabsList>
 
         <ScrollArea className="flex-1 p-2">
+          <TabsContent value="documents" className="mt-0 space-y-2">
+            {totalDocs === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No documents yet. Upload a document to get started.
+              </p>
+            ) : (
+              <>
+                {/* Local documents */}
+                {localDocuments.length > 0 && (
+                  <div className="space-y-1">
+                    {!isLoggedIn && (
+                      <p className="text-xs text-muted-foreground px-2 py-1">
+                        📁 Local (sign in to sync)
+                      </p>
+                    )}
+                    {localDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={cn(
+                          "sidebar-item group cursor-pointer",
+                          currentDocumentId === doc.id && "bg-primary/10 border-l-2 border-primary"
+                        )}
+                        onClick={() => onSelectDocument?.(doc)}
+                      >
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{doc.file_name}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(doc.created_at)}
+                          </p>
+                        </div>
+                        {onDeleteLocalDocument && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteLocalDocument(doc.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Cloud documents */}
+                {cloudDocuments.length > 0 && (
+                  <div className="space-y-1">
+                    {localDocuments.length > 0 && (
+                      <p className="text-xs text-muted-foreground px-2 py-1 mt-3">
+                        ☁️ Synced
+                      </p>
+                    )}
+                    {cloudDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={cn(
+                          "sidebar-item group cursor-pointer",
+                          currentDocumentId === doc.id && "bg-primary/10 border-l-2 border-primary"
+                        )}
+                        onClick={() => onSelectDocument?.(doc)}
+                      >
+                        <FileText className="h-4 w-4 text-primary/70 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{doc.file_name}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(doc.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+
           <TabsContent value="bookmarks" className="mt-0 space-y-2">
             {annotations.bookmarks.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
