@@ -7,6 +7,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Maximum text length to prevent CPU timeout (roughly 500K chars = ~100K words)
+const MAX_TEXT_LENGTH = 500000;
+
+function truncateText(text: string, maxLength: number): { text: string; truncated: boolean } {
+  if (text.length <= maxLength) {
+    return { text, truncated: false };
+  }
+  
+  // Try to truncate at a sentence or paragraph boundary
+  const truncated = text.slice(0, maxLength);
+  const lastParagraph = truncated.lastIndexOf('\n\n');
+  const lastSentence = truncated.lastIndexOf('. ');
+  
+  let cutPoint = maxLength;
+  if (lastParagraph > maxLength * 0.8) {
+    cutPoint = lastParagraph;
+  } else if (lastSentence > maxLength * 0.8) {
+    cutPoint = lastSentence + 1;
+  }
+  
+  return { 
+    text: truncated.slice(0, cutPoint) + '\n\n[Document truncated - showing first portion only due to size limits]',
+    truncated: true 
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -70,14 +96,18 @@ serve(async (req) => {
       );
     }
 
-    console.log('Extracted text length:', text.length);
+    // Truncate if too large to prevent CPU timeout
+    const { text: finalText, truncated } = truncateText(text.trim(), MAX_TEXT_LENGTH);
+    
+    console.log('Extracted text length:', text.length, 'Final length:', finalText.length, 'Truncated:', truncated);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        text: text.trim(),
+        text: finalText,
         fileName: file.name,
-        wordCount: text.trim().split(/\s+/).filter(w => w.length > 0).length
+        wordCount: finalText.split(/\s+/).filter(w => w.length > 0).length,
+        truncated
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
