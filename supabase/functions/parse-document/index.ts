@@ -72,6 +72,10 @@ serve(async (req) => {
       // Simple HTML -> text extraction (server-side)
       const html = new TextDecoder().decode(uint8Array);
       text = extractTextFromHtml(html);
+    } else if (fileName.endsWith('.mht') || fileName.endsWith('.mhtml') || file.type === 'message/rfc822' || file.type === 'multipart/related') {
+      // MHT/MHTML file - extract HTML content and parse it
+      const mhtContent = new TextDecoder().decode(uint8Array);
+      text = extractTextFromMht(mhtContent);
     } else if (fileName.endsWith('.pdf') || file.type === 'application/pdf') {
       text = await extractTextFromPDF(uint8Array);
     } else if (
@@ -91,7 +95,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             error:
-              'Unsupported file format. Please upload PDF, DOCX, EPUB, RTF, HTML, Markdown, or TXT files.',
+              'Unsupported file format. Please upload PDF, DOCX, EPUB, RTF, HTML, MHT, Markdown, or TXT files.',
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -158,6 +162,67 @@ function extractTextFromHtml(html: string): string {
     .trim();
 
   return text;
+}
+
+function extractTextFromMht(mht: string): string {
+  // MHT/MHTML files are MIME-encoded web archives
+  // They contain HTML content within MIME boundaries
+  try {
+    // Find HTML content within the MHT file
+    // Look for Content-Type: text/html section
+    const htmlMatch = mht.match(/Content-Type:\s*text\/html[^\r\n]*[\r\n]+(?:Content-[^\r\n]+[\r\n]+)*[\r\n]+([\s\S]*?)(?=------=_|$)/i);
+    
+    if (htmlMatch && htmlMatch[1]) {
+      let htmlContent = htmlMatch[1];
+      
+      // Handle quoted-printable encoding (common in MHT files)
+      if (mht.toLowerCase().includes('content-transfer-encoding: quoted-printable')) {
+        htmlContent = decodeQuotedPrintable(htmlContent);
+      }
+      
+      // Handle base64 encoding
+      if (mht.toLowerCase().includes('content-transfer-encoding: base64')) {
+        try {
+          htmlContent = atob(htmlContent.replace(/\s/g, ''));
+        } catch {
+          // If base64 decode fails, use content as-is
+        }
+      }
+      
+      return extractTextFromHtml(htmlContent);
+    }
+    
+    // Fallback: try to find any HTML-like content
+    const htmlTagMatch = mht.match(/<html[\s\S]*<\/html>/i);
+    if (htmlTagMatch) {
+      return extractTextFromHtml(htmlTagMatch[0]);
+    }
+    
+    // Last resort: extract all text between body tags or just strip tags
+    const bodyMatch = mht.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      return extractTextFromHtml(bodyMatch[1]);
+    }
+    
+    // If nothing works, try to extract any readable text
+    return extractTextFromHtml(mht);
+  } catch (error) {
+    console.error('Error extracting MHT text:', error);
+    return '';
+  }
+}
+
+function decodeQuotedPrintable(str: string): string {
+  // Decode quoted-printable encoding
+  return str
+    .replace(/=\r?\n/g, '') // Remove soft line breaks
+    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => {
+      try {
+        return String.fromCharCode(parseInt(hex, 16));
+      } catch {
+        return '';
+      }
+    });
 }
 
 function extractTextFromRtf(rtf: string): string {

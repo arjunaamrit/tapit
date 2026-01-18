@@ -14,19 +14,21 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
   const [isDragOver, setIsDragOver] = useState(false);
 
   const processFile = async (file: File) => {
-    const validTypes = [
+  const validTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+      'message/rfc822',
+      'multipart/related',
     ];
     
-    const validExtensions = ['.pdf', '.docx', '.txt'];
+    const validExtensions = ['.pdf', '.docx', '.txt', '.mht', '.mhtml'];
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF, DOCX, or TXT file.",
+        description: "Please upload a PDF, DOCX, TXT, or MHT file.",
         variant: "destructive",
       });
       return;
@@ -142,7 +144,7 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
           
           <input
             type="file"
-            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            accept=".pdf,.docx,.txt,.mht,.mhtml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,message/rfc822"
             onChange={handleFileSelect}
             className="hidden"
             id="document-upload"
@@ -158,7 +160,7 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
           </label>
           
           <p className="text-xs text-muted-foreground mt-4">
-            Supports PDF, DOCX, and TXT files up to 100MB
+            Supports PDF, DOCX, TXT, and MHT files up to 100MB
           </p>
         </>
       )}
