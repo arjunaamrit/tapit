@@ -18,6 +18,7 @@ const supportedFormats = [
   { ext: '.md', type: 'text/markdown', label: 'Markdown' },
   { ext: '.html', type: 'text/html', label: 'HTML' },
   { ext: '.rtf', type: 'application/rtf', label: 'RTF' },
+  { ext: '.mht', type: 'message/rfc822', label: 'MHT' },
 ];
 const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: EnhancedDocumentUploaderProps) => {
   const { toast } = useToast();
@@ -34,15 +35,17 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
       'text/html',
       'application/rtf',
       'text/rtf',
+      'message/rfc822',
+      'multipart/related',
     ];
     
-    const validExtensions = ['.pdf', '.docx', '.epub', '.txt', '.md', '.markdown', '.html', '.htm', '.rtf'];
+    const validExtensions = ['.pdf', '.docx', '.epub', '.txt', '.md', '.markdown', '.html', '.htm', '.rtf', '.mht', '.mhtml'];
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF, DOCX, EPUB, TXT, Markdown, HTML, or RTF file.",
+        description: "Please upload a PDF, DOCX, EPUB, TXT, Markdown, HTML, RTF, or MHT file.",
         variant: "destructive",
       });
       return;
@@ -221,7 +224,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
           
           <input
             type="file"
-            accept=".pdf,.docx,.epub,.txt,.md,.markdown,.html,.htm,.rtf"
+            accept=".pdf,.docx,.epub,.txt,.md,.markdown,.html,.htm,.rtf,.mht,.mhtml"
             onChange={handleFileSelect}
             className="hidden"
             id="document-upload"
