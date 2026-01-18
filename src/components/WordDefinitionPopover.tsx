@@ -111,12 +111,12 @@ const ClickableText = ({
 // Nested definition component for recursive lookups
 const NestedDefinition = ({ 
   word, 
-  context,
+  parentDefinition,
   onClose,
   depth = 1
 }: { 
   word: string;
-  context: string;
+  parentDefinition: string;
   onClose: () => void;
   depth?: number;
 }) => {
@@ -131,6 +131,10 @@ const NestedDefinition = ({
       setError("");
       
       try {
+        // Use the parent definition as context for the nested word lookup
+        // This gives better contextual meaning than the original document context
+        const contextAroundWord = parentDefinition;
+        
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
           {
@@ -138,7 +142,7 @@ const NestedDefinition = ({
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ word, context }),
+            body: JSON.stringify({ word, context: contextAroundWord }),
           }
         );
 
@@ -162,7 +166,7 @@ const NestedDefinition = ({
     };
 
     fetchDefinition();
-  }, [word, context]);
+  }, [word, parentDefinition]);
 
   const handleNestedWordClick = useCallback((clickedWord: string) => {
     if (clickedWord.toLowerCase() !== word.toLowerCase()) {
@@ -213,7 +217,7 @@ const NestedDefinition = ({
       {nestedWord && depth < 5 && (
         <NestedDefinition 
           word={nestedWord}
-          context={context}
+          parentDefinition={definition}
           onClose={() => setNestedWord(null)}
           depth={depth + 1}
         />
@@ -504,7 +508,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
             {nestedWord && (
               <NestedDefinition 
                 word={nestedWord}
-                context={context}
+                parentDefinition={definition}
                 onClose={() => setNestedWord(null)}
                 depth={1}
               />
