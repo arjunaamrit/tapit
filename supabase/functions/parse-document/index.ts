@@ -14,13 +14,23 @@ const MAX_TEXT_LENGTH = 500000;
 // Hard cap on how many PDF pages we try to process in an Edge/worker environment.
 const MAX_PDF_PAGES = 50;
 
+// Remove null bytes and other problematic characters that PostgreSQL can't store
+function sanitizeText(text: string): string {
+  return text
+    .replace(/\0/g, '') // Remove null bytes
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''); // Remove other control characters except \t, \n, \r
+}
+
 function truncateText(text: string, maxLength: number): { text: string; truncated: boolean } {
-  if (text.length <= maxLength) {
-    return { text, truncated: false };
+  // First sanitize the text
+  const sanitized = sanitizeText(text);
+  
+  if (sanitized.length <= maxLength) {
+    return { text: sanitized, truncated: false };
   }
 
   // Try to truncate at a sentence or paragraph boundary
-  const truncated = text.slice(0, maxLength);
+  const truncated = sanitized.slice(0, maxLength);
   const lastParagraph = truncated.lastIndexOf('\n\n');
   const lastSentence = truncated.lastIndexOf('. ');
 
