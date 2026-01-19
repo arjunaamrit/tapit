@@ -281,8 +281,6 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     };
 
     fetchDefinition();
-    // Pre-fill search with the selected word
-    setSearchQuery(word);
   }, [word, context]);
 
   const handleNestedWordClick = useCallback((clickedWord: string) => {
