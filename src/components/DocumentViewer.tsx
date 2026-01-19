@@ -75,7 +75,28 @@ const DocumentViewer = ({ text, onWordSelect }: DocumentViewerProps) => {
       <div
         ref={containerRef}
         className="prose prose-sm md:prose-base max-w-none select-text cursor-text"
+        style={{ touchAction: 'pan-x pan-y' }}
         onDoubleClick={handleDoubleClick}
+        onTouchEnd={(e) => {
+          // Handle double-tap on mobile without triggering zoom
+          const now = Date.now();
+          const lastTap = (containerRef.current as any)?._lastTap || 0;
+          if (now - lastTap < 300) {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            if (touch) {
+              const mouseEvent = new MouseEvent('dblclick', {
+                bubbles: true,
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+              });
+              e.target?.dispatchEvent(mouseEvent);
+            }
+          }
+          if (containerRef.current) {
+            (containerRef.current as any)._lastTap = now;
+          }
+        }}
       >
         {paragraphs.map((paragraph, index) => (
           <p key={index} className="mb-4 leading-relaxed text-foreground">
