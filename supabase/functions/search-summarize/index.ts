@@ -5,28 +5,61 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple function to extract text content from HTML
+// Enhanced function to extract text content from HTML with better structure
 function extractTextFromHtml(html: string): string {
-  // Remove script and style tags
+  // Remove script, style, nav, footer, aside, and ad-related tags
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  // Remove HTML tags
+  text = text.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+  text = text.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+  text = text.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+  text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
+  
+  // Try to extract main content areas first
+  const mainContentMatch = text.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
+                           text.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
+                           text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+  
+  if (mainContentMatch) {
+    text = mainContentMatch[1];
+  }
+  
+  // Remove HTML tags but preserve some structure
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+  text = text.replace(/<\/li>/gi, '\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
   text = text.replace(/<[^>]+>/g, ' ');
+  
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  
   // Clean up whitespace
-  text = text.replace(/\s+/g, ' ').trim();
-  // Limit text length
-  return text.substring(0, 5000);
+  text = text.replace(/[ \t]+/g, ' ');
+  text = text.replace(/\n\s*\n/g, '\n\n');
+  text = text.trim();
+  
+  // Increase content limit for better summaries
+  return text.substring(0, 8000);
 }
 
-// Fetch content from a URL
-async function fetchUrlContent(url: string): Promise<{ url: string; title: string; content: string } | null> {
+// Fetch content from a URL with improved extraction
+async function fetchUrlContent(url: string): Promise<{ url: string; title: string; content: string; description: string } | null> {
   try {
     console.log(`Fetching: ${url}`);
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
       },
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(8000)
     });
     
     if (!response.ok) {
@@ -38,12 +71,17 @@ async function fetchUrlContent(url: string): Promise<{ url: string; title: strin
     
     // Extract title
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : url;
+    const title = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : url;
+    
+    // Extract meta description
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
+                      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+    const description = descMatch ? descMatch[1].trim() : '';
     
     // Extract content
     const content = extractTextFromHtml(html);
     
-    return { url, title, content };
+    return { url, title, content, description };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.log(`Error fetching ${url}:`, errorMessage);
@@ -51,7 +89,7 @@ async function fetchUrlContent(url: string): Promise<{ url: string; title: strin
   }
 }
 
-// Use DuckDuckGo HTML search to find URLs
+// Use DuckDuckGo HTML search to find URLs - fetch more results
 async function searchForUrls(query: string): Promise<string[]> {
   try {
     console.log(`Searching for: ${query}`);
@@ -60,7 +98,7 @@ async function searchForUrls(query: string): Promise<string[]> {
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const response = await fetch(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
     
@@ -71,15 +109,20 @@ async function searchForUrls(query: string): Promise<string[]> {
     
     const html = await response.text();
     
-    // Extract URLs from search results
+    // Extract URLs from search results - get more URLs
     const urlRegex = /href="\/\/duckduckgo\.com\/l\/\?uddg=([^&"]+)/g;
     const urls: string[] = [];
     let match;
     
-    while ((match = urlRegex.exec(html)) !== null && urls.length < 5) {
+    while ((match = urlRegex.exec(html)) !== null && urls.length < 8) {
       try {
         const decodedUrl = decodeURIComponent(match[1]);
-        if (decodedUrl.startsWith('http')) {
+        // Filter out some non-useful domains
+        if (decodedUrl.startsWith('http') && 
+            !decodedUrl.includes('youtube.com') &&
+            !decodedUrl.includes('facebook.com') &&
+            !decodedUrl.includes('twitter.com') &&
+            !decodedUrl.includes('instagram.com')) {
           urls.push(decodedUrl);
         }
       } catch (e) {
@@ -125,10 +168,10 @@ serve(async (req) => {
       );
     }
 
-    // Step 2: Fetch content from URLs
+    // Step 2: Fetch content from URLs in parallel
     const contentPromises = urls.map(url => fetchUrlContent(url));
     const results = await Promise.all(contentPromises);
-    const validResults = results.filter(r => r !== null) as { url: string; title: string; content: string }[];
+    const validResults = results.filter(r => r !== null) as { url: string; title: string; content: string; description: string }[];
 
     if (validResults.length === 0) {
       return new Response(
@@ -142,14 +185,14 @@ serve(async (req) => {
 
     console.log(`Successfully fetched ${validResults.length} pages`);
 
-    // Step 3: Summarize using Lovable AI
+    // Step 3: Summarize using Lovable AI with enhanced prompt
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     const combinedContent = validResults.map((r, i) => 
-      `Source ${i + 1} (${r.title}):\n${r.content}`
+      `Source ${i + 1}: ${r.title}\nDescription: ${r.description || 'N/A'}\nContent:\n${r.content}`
     ).join('\n\n---\n\n');
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -163,21 +206,29 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a helpful research assistant. Summarize the following web content that was found for the search query "${query}". 
-            
-Provide a comprehensive but concise summary that:
-1. Answers the user's search query directly
-2. Synthesizes information from multiple sources
-3. Highlights key facts and insights
-4. Uses clear, easy-to-read formatting with bullet points where appropriate
+            content: `You are an expert research assistant that synthesizes information from multiple web sources. Your task is to provide a comprehensive, accurate, and well-organized answer to the user's question.
 
-Keep the summary informative but not too long (2-3 paragraphs max).`
+Guidelines:
+1. **Directly answer the question** - Start with the most relevant information
+2. **Synthesize from all sources** - Combine insights from multiple sources for a complete picture
+3. **Use clear formatting** - Use bullet points, numbered lists, or short paragraphs
+4. **Be factual** - Only include information found in the sources
+5. **Highlight key points** - Make important facts stand out
+6. **Keep it concise but complete** - Aim for 2-4 paragraphs or equivalent
+
+Format your response to be easy to read and scan quickly.`
           },
           {
             role: 'user',
-            content: `Here is the content from ${validResults.length} web pages about "${query}":\n\n${combinedContent}`
+            content: `Question: "${query}"
+
+Here is content from ${validResults.length} web sources. Synthesize this information to answer the question:
+
+${combinedContent}`
           }
         ],
+        max_tokens: 1000,
+        temperature: 0.3,
       }),
     });
 
