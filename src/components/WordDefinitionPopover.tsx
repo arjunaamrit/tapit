@@ -113,15 +113,21 @@ const NestedDefinition = ({
   word, 
   parentDefinition,
   onClose,
-  depth = 1
+  depth = 1,
+  targetLanguage,
+  targetLanguageName
 }: { 
   word: string;
   parentDefinition: string;
   onClose: () => void;
   depth?: number;
+  targetLanguage?: string | null;
+  targetLanguageName?: string | null;
 }) => {
   const [definition, setDefinition] = useState<string>("");
+  const [translatedDefinition, setTranslatedDefinition] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string>("");
   const [nestedWord, setNestedWord] = useState<string | null>(null);
 
@@ -168,6 +174,32 @@ const NestedDefinition = ({
     fetchDefinition();
   }, [word, parentDefinition]);
 
+  // Translate definition when language is selected and definition is ready
+  useEffect(() => {
+    const translateDefinition = async () => {
+      if (!targetLanguage || !targetLanguageName || !definition) {
+        setTranslatedDefinition("");
+        return;
+      }
+      
+      setIsTranslating(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('translate-word', {
+          body: { word: definition, targetLanguage, targetLanguageName }
+        });
+        
+        if (error) throw error;
+        setTranslatedDefinition(data.translation);
+      } catch (err) {
+        console.error('Translation error:', err);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    translateDefinition();
+  }, [targetLanguage, targetLanguageName, definition]);
+
   const handleNestedWordClick = useCallback((clickedWord: string) => {
     if (clickedWord.toLowerCase() !== word.toLowerCase()) {
       setNestedWord(clickedWord);
@@ -182,6 +214,8 @@ const NestedDefinition = ({
     }
   };
 
+  const displayDefinition = targetLanguage && translatedDefinition ? translatedDefinition : definition;
+
   return (
     <div className={`border-l-2 border-primary/40 pl-3 mt-3 ${depth > 3 ? 'opacity-75' : ''}`}>
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -195,6 +229,11 @@ const NestedDefinition = ({
           >
             <Volume2 className="h-3 w-3" />
           </Button>
+          {targetLanguageName && (
+            <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+              {targetLanguageName}
+            </span>
+          )}
         </div>
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={onClose}>
           <X className="h-3 w-3" />
@@ -208,9 +247,14 @@ const NestedDefinition = ({
         </div>
       ) : error ? (
         <p className="text-xs text-destructive">{error}</p>
+      ) : isTranslating ? (
+        <div className="flex items-center gap-2 py-2">
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Translating...</span>
+        </div>
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          <ClickableText text={definition} onWordClick={handleNestedWordClick} />
+          <ClickableText text={displayDefinition} onWordClick={handleNestedWordClick} />
         </p>
       )}
 
@@ -220,6 +264,8 @@ const NestedDefinition = ({
           parentDefinition={definition}
           onClose={() => setNestedWord(null)}
           depth={depth + 1}
+          targetLanguage={targetLanguage}
+          targetLanguageName={targetLanguageName}
         />
       )}
     </div>
@@ -240,8 +286,11 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   
   // Translation state
   const [translation, setTranslation] = useState<string | null>(null);
+  const [translatedDefinition, setTranslatedDefinition] = useState<string | null>(null);
+  const [translatedSearchSummary, setTranslatedSearchSummary] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [selectedLanguageCode, setSelectedLanguageCode] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDefinition = async () => {
@@ -331,16 +380,35 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   const handleTranslate = async (langCode: string, langName: string) => {
     setIsTranslating(true);
     setSelectedLanguage(langName);
+    setSelectedLanguageCode(langCode);
     setTranslation(null);
+    setTranslatedDefinition(null);
+    setTranslatedSearchSummary(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('translate-word', {
-        body: { word, targetLanguage: langCode, targetLanguageName: langName }
-      });
+      // Translate word and definition in parallel
+      const translationPromises = [
+        supabase.functions.invoke('translate-word', {
+          body: { word, targetLanguage: langCode, targetLanguageName: langName }
+        }),
+        definition ? supabase.functions.invoke('translate-word', {
+          body: { word: definition, targetLanguage: langCode, targetLanguageName: langName }
+        }) : Promise.resolve({ data: null }),
+        searchResult?.summary ? supabase.functions.invoke('translate-word', {
+          body: { word: searchResult.summary, targetLanguage: langCode, targetLanguageName: langName }
+        }) : Promise.resolve({ data: null })
+      ];
 
-      if (error) throw error;
+      const results = await Promise.all(translationPromises);
+      const wordResult = results[0] as { data: { translation?: string } | null; error: Error | null };
+      const defResult = results[1] as { data: { translation?: string } | null; error: Error | null };
+      const searchSummaryResult = results[2] as { data: { translation?: string } | null; error: Error | null };
+
+      if (wordResult.error) throw wordResult.error;
       
-      setTranslation(data.translation);
+      setTranslation(wordResult.data?.translation || null);
+      setTranslatedDefinition(defResult.data?.translation || null);
+      setTranslatedSearchSummary(searchSummaryResult.data?.translation || null);
     } catch (error) {
       console.error('Translation error:', error);
       toast({
@@ -349,9 +417,19 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
         variant: "destructive",
       });
       setSelectedLanguage(null);
+      setSelectedLanguageCode(null);
     } finally {
       setIsTranslating(false);
     }
+  };
+
+  // Clear translation when language is deselected
+  const handleClearTranslation = () => {
+    setSelectedLanguage(null);
+    setSelectedLanguageCode(null);
+    setTranslation(null);
+    setTranslatedDefinition(null);
+    setTranslatedSearchSummary(null);
   };
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -469,25 +547,41 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
               </Button>
             </div>
 
-            {/* Translation Result */}
-            {(translation || isTranslating) && selectedLanguage && (
+            {/* Translation Indicator - Shows when a language is selected */}
+            {selectedLanguage && (
               <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="flex items-center gap-2 mb-1">
-                  <Languages className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-medium text-primary">{selectedLanguage}</span>
-                </div>
-                {isTranslating ? (
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Translating...</span>
+                    <Languages className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-medium text-primary">
+                      Translating to {selectedLanguage}
+                    </span>
                   </div>
-                ) : (
-                  <p className="text-sm font-medium">{translation}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleClearTranslation}
+                  >
+                    Show Original
+                  </Button>
+                </div>
+                {isTranslating && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Translating all content...</span>
+                  </div>
+                )}
+                {!isTranslating && translation && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground">Word:</p>
+                    <p className="text-sm font-medium">{translation}</p>
+                  </div>
                 )}
               </div>
             )}
             
-            {/* Definition Content */}
+            {/* Definition Content - Shows translated if language selected */}
             <div className="min-h-[60px] mb-4">
               {isLoading ? (
                 <div className="flex items-center justify-center py-4">
@@ -497,18 +591,23 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
                 <p className="text-sm text-destructive">{error}</p>
               ) : (
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  <ClickableText text={definition} onWordClick={handleNestedWordClick} />
+                  <ClickableText 
+                    text={selectedLanguage && translatedDefinition ? translatedDefinition : definition} 
+                    onWordClick={handleNestedWordClick} 
+                  />
                 </p>
               )}
             </div>
 
-            {/* Nested Definition */}
+            {/* Nested Definition - Pass selected language */}
             {nestedWord && (
               <NestedDefinition 
                 word={nestedWord}
                 parentDefinition={definition}
                 onClose={() => setNestedWord(null)}
                 depth={1}
+                targetLanguage={selectedLanguageCode}
+                targetLanguageName={selectedLanguage}
               />
             )}
 
@@ -574,10 +673,15 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
                   <div className="bg-gradient-to-br from-muted/50 to-muted/30 p-4 rounded-xl border border-border">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                      <span className="text-xs font-medium text-muted-foreground">AI Summary</span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        AI Summary {selectedLanguage && translatedSearchSummary && `(${selectedLanguage})`}
+                      </span>
                     </div>
                     <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                      <ClickableText text={searchResult.summary} onWordClick={handleNestedWordClick} />
+                      <ClickableText 
+                        text={selectedLanguage && translatedSearchSummary ? translatedSearchSummary : searchResult.summary} 
+                        onWordClick={handleNestedWordClick} 
+                      />
                     </div>
                   </div>
 
