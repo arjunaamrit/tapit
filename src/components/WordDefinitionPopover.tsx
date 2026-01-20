@@ -220,7 +220,7 @@ const NestedDefinition = ({
     <div className={`border-l-2 border-primary/40 pl-3 mt-3 ${depth > 3 ? 'opacity-75' : ''}`}>
       <div className="flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm capitalize">{word}</span>
+          <span className="font-semibold text-sm capitalize text-foreground">{word}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -253,7 +253,7 @@ const NestedDefinition = ({
           <span className="text-xs text-muted-foreground">Translating...</span>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs text-foreground leading-relaxed font-medium">
           <ClickableText text={displayDefinition} onWordClick={handleNestedWordClick} />
         </p>
       )}
@@ -524,7 +524,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg capitalize">{word}</h3>
+                <h3 className="font-bold text-lg capitalize text-foreground">{word}</h3>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -619,7 +619,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
               ) : error ? (
                 <p className="text-sm text-destructive">{error}</p>
               ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm text-foreground leading-relaxed font-medium">
                   <ClickableText 
                     text={selectedLanguage && translatedDefinition ? translatedDefinition : definition} 
                     onWordClick={handleNestedWordClick} 
@@ -642,7 +642,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
 
             {/* Hint */}
             {!isLoading && !error && (
-              <p className="text-xs text-muted-foreground/70 mb-3 italic">
+              <p className="text-xs text-muted-foreground mb-3 italic">
                 💡 Double-tap any word in the definition to look it up
               </p>
             )}
