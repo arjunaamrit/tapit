@@ -385,35 +385,64 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     setTranslatedDefinition(null);
     setTranslatedSearchSummary(null);
     
+    // Helper to add delay between API calls to avoid rate limiting
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Helper to translate with retry on rate limit
+    const translateWithRetry = async (text: string, retries = 2): Promise<string | null> => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const { data, error } = await supabase.functions.invoke('translate-word', {
+            body: { word: text, targetLanguage: langCode, targetLanguageName: langName }
+          });
+          
+          if (error) {
+            const errorMsg = error.message || '';
+            if (errorMsg.includes('Rate limit') || errorMsg.includes('429')) {
+              if (attempt < retries) {
+                await delay(1500 * (attempt + 1)); // Increasing delay: 1.5s, 3s
+                continue;
+              }
+            }
+            throw error;
+          }
+          
+          return data?.translation || null;
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
+            if (attempt < retries) {
+              await delay(1500 * (attempt + 1));
+              continue;
+            }
+          }
+          throw err;
+        }
+      }
+      return null;
+    };
+    
     try {
-      // Translate word and definition in parallel
-      const translationPromises = [
-        supabase.functions.invoke('translate-word', {
-          body: { word, targetLanguage: langCode, targetLanguageName: langName }
-        }),
-        definition ? supabase.functions.invoke('translate-word', {
-          body: { word: definition, targetLanguage: langCode, targetLanguageName: langName }
-        }) : Promise.resolve({ data: null }),
-        searchResult?.summary ? supabase.functions.invoke('translate-word', {
-          body: { word: searchResult.summary, targetLanguage: langCode, targetLanguageName: langName }
-        }) : Promise.resolve({ data: null })
-      ];
-
-      const results = await Promise.all(translationPromises);
-      const wordResult = results[0] as { data: { translation?: string } | null; error: Error | null };
-      const defResult = results[1] as { data: { translation?: string } | null; error: Error | null };
-      const searchSummaryResult = results[2] as { data: { translation?: string } | null; error: Error | null };
-
-      if (wordResult.error) throw wordResult.error;
+      // Translate sequentially with delays to avoid rate limiting
+      const wordTranslation = await translateWithRetry(word);
+      setTranslation(wordTranslation);
       
-      setTranslation(wordResult.data?.translation || null);
-      setTranslatedDefinition(defResult.data?.translation || null);
-      setTranslatedSearchSummary(searchSummaryResult.data?.translation || null);
+      if (definition) {
+        await delay(500); // Small delay between calls
+        const defTranslation = await translateWithRetry(definition);
+        setTranslatedDefinition(defTranslation);
+      }
+      
+      if (searchResult?.summary) {
+        await delay(500);
+        const summaryTranslation = await translateWithRetry(searchResult.summary);
+        setTranslatedSearchSummary(summaryTranslation);
+      }
     } catch (error) {
       console.error('Translation error:', error);
       toast({
         title: "Translation failed",
-        description: "Please try again later",
+        description: "Rate limit exceeded. Please wait a moment and try again.",
         variant: "destructive",
       });
       setSelectedLanguage(null);
