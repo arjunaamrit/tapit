@@ -36,7 +36,14 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a translator. Translate the given English word or phrase to ${targetLanguageName}. Only respond with the translation, nothing else. If it's a single word, provide the most common translation. Include pronunciation guide in parentheses if the target language uses a different script.`
+            content: `You are a professional translator. Translate the given English text to ${targetLanguageName}. 
+            
+Guidelines:
+- Maintain the same formatting and structure as the original
+- For single words, provide the most common translation with pronunciation guide in parentheses if using a different script
+- For longer text (definitions, paragraphs), translate naturally while preserving meaning
+- Keep any technical terms or proper nouns appropriately translated or transliterated
+- Only respond with the translation, nothing else`
           },
           {
             role: 'user',
