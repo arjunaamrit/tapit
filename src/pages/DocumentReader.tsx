@@ -21,7 +21,8 @@ import {
   Quote,
   Users,
   FileCheck,
-  Globe
+  Globe,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +39,8 @@ import { DocumentLibraryDialog } from "@/components/reader/DocumentLibraryDialog
 import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
 import { DocumentChat } from "@/components/reader/DocumentChat";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
+import { OnboardingTour, useOnboardingTour } from "@/components/OnboardingTour";
+import { SAMPLE_DOCUMENT } from "@/data/sampleDocument";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,6 +88,9 @@ const DocumentReader = () => {
 
   // Document chat
   const [isChatOpen, setIsChatOpen] = useState(false);
+  
+  // Onboarding tour
+  const { showOnboarding, closeOnboarding, openOnboarding } = useOnboardingTour();
   // Use database annotations when user is logged in and document is saved
   const {
     highlights: dbHighlights,
@@ -237,6 +243,19 @@ const DocumentReader = () => {
     setCurrentLocalDocId(null);
     setShowPopover(false);
     setSelectedWord(null);
+  };
+
+  const handleLoadSampleDocument = () => {
+    setDocumentText(SAMPLE_DOCUMENT.content);
+    setFileName(SAMPLE_DOCUMENT.fileName);
+    setCurrentDocumentId(null);
+    setCurrentLocalDocId(null);
+    setShowPopover(false);
+    setSelectedWord(null);
+    toast({ 
+      title: "Sample document loaded", 
+      description: "Try double-clicking any word to see the AI definition feature!" 
+    });
   };
 
   const handleSelectDocumentFromLibrary = (doc: Document) => {
@@ -530,7 +549,7 @@ const DocumentReader = () => {
                 Get instant definitions, annotate with ease, and listen to your content.
               </p>
 
-              <div className="animate-fade-in-up animation-delay-450 flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+              <div className="animate-fade-in-up animation-delay-450 flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
                 <Button 
                   size="lg" 
                   className="gap-2 px-8 py-6 text-lg rounded-2xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
@@ -543,11 +562,28 @@ const DocumentReader = () => {
                   variant="outline" 
                   size="lg" 
                   className="gap-2 px-8 py-6 text-lg rounded-2xl"
+                  onClick={handleLoadSampleDocument}
+                >
+                  <Sparkles className="h-5 w-5" />
+                  Try Sample Document
+                </Button>
+              </div>
+              
+              <div className="animate-fade-in-up animation-delay-500 flex items-center justify-center gap-6 mb-16">
+                <button
                   onClick={() => document.getElementById('features-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
                 >
                   Learn More
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={openOnboarding}
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  Take a Tour
+                </button>
               </div>
 
               {/* Mock Preview */}
@@ -734,7 +770,12 @@ const DocumentReader = () => {
           {/* Footer */}
           <footer className="border-t border-border/40 py-8">
             <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-              <p>© 2024 ReadMate. Built with ❤️ for learners everywhere.</p>
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+                <span>•</span>
+                <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+              </div>
+              <p>© 2025 ReadMate. Built with ❤️ for learners everywhere.</p>
             </div>
           </footer>
         </main>
@@ -827,6 +868,13 @@ const DocumentReader = () => {
         onClose={() => setIsChatOpen(false)}
         documentContent={documentText}
         documentName={fileName}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        isOpen={showOnboarding}
+        onClose={closeOnboarding}
+        onComplete={closeOnboarding}
       />
     </div>
   );
