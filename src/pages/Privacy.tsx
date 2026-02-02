@@ -184,7 +184,7 @@ const Privacy = () => {
             <span>•</span>
             <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
           </div>
-          <p>© 2025 ReadMate. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ReadMate. All rights reserved.</p>
         </div>
       </footer>
     </div>
