@@ -529,38 +529,50 @@ const DocumentReader = () => {
                 </button>
               </div>
 
-              {/* Mock Preview */}
+              {/* Interactive Preview */}
               <div className="animate-fade-in-up animation-delay-600 relative max-w-4xl mx-auto">
-                <div className="glass-card rounded-3xl p-8 shadow-2xl">
+                <div className="glass-card rounded-3xl p-8 shadow-2xl border border-primary/10 hover:border-primary/20 transition-all duration-500">
                   <div className="flex items-center gap-2 mb-6">
                     <div className="w-3 h-3 rounded-full bg-destructive/60" />
                     <div className="w-3 h-3 rounded-full bg-accent/60" />
                     <div className="w-3 h-3 rounded-full bg-primary/60" />
-                    <span className="ml-4 text-sm text-muted-foreground">sample-document.pdf</span>
+                    <span className="ml-4 text-sm text-muted-foreground font-medium">Your Document</span>
+                    <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                      <Volume2 className="h-3 w-3" />
+                      <span>Text-to-Speech</span>
+                    </div>
                   </div>
-                  <div className="bg-reader-bg rounded-2xl p-6 text-left reader-prose text-reader-text">
-                    <p className="text-lg mb-4">
-                      The concept of <span className="bg-primary/20 px-1 rounded cursor-pointer border-b-2 border-primary">artificial intelligence</span> has 
+                  <div className="bg-gradient-to-br from-reader-bg to-background rounded-2xl p-8 text-left reader-prose text-reader-text relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
+                    <p className="text-lg mb-4 relative z-10">
+                      The concept of <span className="bg-primary/30 px-1.5 py-0.5 rounded cursor-pointer border-b-2 border-primary font-medium">artificial intelligence</span> has 
                       evolved significantly over the decades, transforming from theoretical 
-                      discussions into <span className="highlight-yellow px-1 rounded">practical applications</span> that 
+                      discussions into <span className="highlight-yellow px-1.5 py-0.5 rounded font-medium">practical applications</span> that 
                       impact our daily lives...
                     </p>
-                    <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-card rounded-xl shadow-lg border border-border">
-                      <Zap className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Definition appears here</span>
+                    <div className="inline-flex items-center gap-3 mt-4 px-5 py-3 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl border border-primary/20">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Zap className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">artificial intelligence</p>
+                        <p className="text-sm font-medium">The simulation of human intelligence by machines...</p>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
                 {/* Floating elements */}
-                <div className="absolute -top-4 -right-4 md:-right-8 animate-float">
-                  <div className="bg-primary text-primary-foreground px-4 py-2 rounded-xl shadow-lg text-sm font-medium">
-                    ✨ Double-tap any word
+                <div className="absolute -top-6 -right-2 md:-right-12 animate-float">
+                  <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2">
+                    <MousePointer2 className="h-4 w-4" />
+                    Double-tap any word
                   </div>
                 </div>
-                <div className="absolute -bottom-4 -left-4 md:-left-8 animate-float-delayed">
-                  <div className="bg-accent text-accent-foreground px-4 py-2 rounded-xl shadow-lg text-sm font-medium">
-                    📝 Add notes & highlights
+                <div className="absolute -bottom-6 -left-2 md:-left-12 animate-float-delayed">
+                  <div className="bg-gradient-to-r from-accent to-accent/80 text-accent-foreground px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" />
+                    Smart annotations
                   </div>
                 </div>
               </div>
