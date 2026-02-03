@@ -18,6 +18,7 @@ import {
   MessageSquare,
   HelpCircle
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -467,6 +468,8 @@ const DocumentReader = () => {
                   <span className="hidden sm:inline">Sign In</span>
                 </Button>
               )}
+              
+              <ThemeToggle />
             </div>
           </div>
         </div>
