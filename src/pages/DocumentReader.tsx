@@ -35,6 +35,7 @@ import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
 import { DocumentChat } from "@/components/reader/DocumentChat";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import { OnboardingTour, useOnboardingTour } from "@/components/OnboardingTour";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import {
   DropdownMenu,
@@ -67,6 +68,7 @@ const DocumentReader = () => {
   const [speechRate, setSpeechRate] = useState(1);
   const [selectedVoice, setSelectedVoice] = useState(0);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const isMobile = useIsMobile();
 
   // In-document search
   const {
@@ -682,26 +684,28 @@ const DocumentReader = () => {
         </main>
       ) : (
         <div className="flex h-[calc(100vh-64px)]">
-          {/* Sidebar */}
-          <ReaderSidebar
-            annotations={annotations}
-            onJumpToBookmark={handleJumpToBookmark}
-            onJumpToHighlight={handleJumpToHighlight}
-            onRemoveBookmark={dbRemoveBookmark}
-            onRemoveHighlight={dbRemoveHighlight}
-            onRemoveNote={dbRemoveNote}
-            fileName={fileName}
-            localDocuments={localDocuments}
-            cloudDocuments={documents}
-            currentDocumentId={currentDocumentId || currentLocalDocId}
-            onSelectDocument={handleSelectAnyDocument}
-            onDeleteLocalDocument={handleDeleteLocalDocument}
-            isLoggedIn={!!user}
-          />
+          {/* Sidebar (hidden on mobile so document uses full width) */}
+          {!isMobile && (
+            <ReaderSidebar
+              annotations={annotations}
+              onJumpToBookmark={handleJumpToBookmark}
+              onJumpToHighlight={handleJumpToHighlight}
+              onRemoveBookmark={dbRemoveBookmark}
+              onRemoveHighlight={dbRemoveHighlight}
+              onRemoveNote={dbRemoveNote}
+              fileName={fileName}
+              localDocuments={localDocuments}
+              cloudDocuments={documents}
+              currentDocumentId={currentDocumentId || currentLocalDocId}
+              onSelectDocument={handleSelectAnyDocument}
+              onDeleteLocalDocument={handleDeleteLocalDocument}
+              isLoggedIn={!!user}
+            />
+          )}
 
-          {/* Main Content - Full width */}
-          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-            <div className="max-w-5xl mx-auto">
+          {/* Main Content (fills remaining space on all devices) */}
+          <main className="flex-1 w-full overflow-auto p-2 sm:p-4 md:p-6 lg:p-8">
+            <div className="w-full">
               {/* Document Organization */}
               {user && currentDocumentId && (
                 <div className="mb-4">
