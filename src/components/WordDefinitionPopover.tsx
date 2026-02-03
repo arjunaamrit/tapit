@@ -338,25 +338,14 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     }
   }, [word]);
 
-  // Calculate position to keep popover in viewport - BIGGER popup
+  // Center the popover on screen for better UX
   const calculatePosition = () => {
     const popoverWidth = 480;
     const popoverHeight = searchResult ? 600 : nestedWord ? 450 : 380;
-    const padding = 16;
     
-    let x = position.x - popoverWidth / 2;
-    let y = position.y;
-    
-    // Keep within horizontal bounds
-    if (x < padding) x = padding;
-    if (x + popoverWidth > window.innerWidth - padding) {
-      x = window.innerWidth - popoverWidth - padding;
-    }
-    
-    // If popover would go below viewport, show above the word
-    if (y + popoverHeight > window.innerHeight - padding) {
-      y = position.y - popoverHeight - 40;
-    }
+    // Center horizontally and vertically on screen
+    const x = Math.max(16, (window.innerWidth - popoverWidth) / 2);
+    const y = Math.max(16, (window.innerHeight - popoverHeight) / 2);
     
     return { left: x, top: y };
   };

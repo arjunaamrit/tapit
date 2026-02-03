@@ -699,9 +699,9 @@ const DocumentReader = () => {
             isLoggedIn={!!user}
           />
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto p-6 md:p-8">
-            <div className="max-w-3xl mx-auto">
+          {/* Main Content - Full width */}
+          <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+            <div className="max-w-5xl mx-auto">
               {/* Document Organization */}
               {user && currentDocumentId && (
                 <div className="mb-4">
