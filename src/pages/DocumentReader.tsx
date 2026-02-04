@@ -683,7 +683,7 @@ const DocumentReader = () => {
           </footer>
         </main>
       ) : (
-        <div className="flex h-[calc(100vh-64px)]">
+        <div className="flex w-full h-[calc(100dvh-64px)] overflow-hidden">
           {/* Sidebar (hidden on mobile so document uses full width) */}
           {!isMobile && (
             <ReaderSidebar
@@ -704,8 +704,8 @@ const DocumentReader = () => {
           )}
 
           {/* Main Content (fills remaining space on all devices) */}
-          <main className="flex-1 w-full overflow-auto p-2 sm:p-4 md:p-6 lg:p-8">
-            <div className="w-full">
+          <main className="flex-1 min-w-0 w-full overflow-auto p-0 sm:p-2 md:p-4 lg:p-6">
+            <div className="w-full max-w-none">
               {/* Document Organization */}
               {user && currentDocumentId && (
                 <div className="mb-4">
@@ -722,7 +722,7 @@ const DocumentReader = () => {
                 </div>
               )}
               
-              <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="flex items-center justify-center gap-4 mb-3 sm:mb-6 px-2 sm:px-0">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-sm text-muted-foreground">
                   <MousePointer2 className="h-4 w-4" />
                   Double-click any word for its definition
