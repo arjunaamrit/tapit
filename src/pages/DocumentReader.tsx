@@ -16,7 +16,8 @@ import {
   Loader2,
   Search,
   MessageSquare,
-  HelpCircle
+  HelpCircle,
+  PanelLeft
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
 import { DocumentChat } from "@/components/reader/DocumentChat";
 import WordDefinitionPopover from "@/components/WordDefinitionPopover";
 import { OnboardingTour, useOnboardingTour } from "@/components/OnboardingTour";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 import {
   DropdownMenu,
@@ -68,7 +69,7 @@ const DocumentReader = () => {
   const [speechRate, setSpeechRate] = useState(1);
   const [selectedVoice, setSelectedVoice] = useState(0);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const isMobile = useIsMobile();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // In-document search
   const {
@@ -404,6 +405,48 @@ const DocumentReader = () => {
               )}
                   {documentText && (
                     <>
+                      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                        <SheetTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            title="Open document sidebar"
+                          >
+                            <PanelLeft className="h-4 w-4" />
+                            <span className="hidden sm:inline">Library</span>
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent side="left" className="p-0 w-[18rem] sm:w-[20rem]">
+                          <div className="h-[100dvh]">
+                            <ReaderSidebar
+                              annotations={annotations}
+                              onJumpToBookmark={(i) => {
+                                setIsSidebarOpen(false);
+                                handleJumpToBookmark(i);
+                              }}
+                              onJumpToHighlight={(o) => {
+                                setIsSidebarOpen(false);
+                                handleJumpToHighlight(o);
+                              }}
+                              onRemoveBookmark={dbRemoveBookmark}
+                              onRemoveHighlight={dbRemoveHighlight}
+                              onRemoveNote={dbRemoveNote}
+                              fileName={fileName}
+                              localDocuments={localDocuments}
+                              cloudDocuments={documents}
+                              currentDocumentId={currentDocumentId || currentLocalDocId}
+                              onSelectDocument={(doc) => {
+                                setIsSidebarOpen(false);
+                                handleSelectAnyDocument(doc);
+                              }}
+                              onDeleteLocalDocument={handleDeleteLocalDocument}
+                              isLoggedIn={!!user}
+                            />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -684,26 +727,7 @@ const DocumentReader = () => {
         </main>
       ) : (
         <div className="flex w-full h-[calc(100dvh-64px)] overflow-hidden">
-          {/* Sidebar (hidden on mobile so document uses full width) */}
-          {!isMobile && (
-            <ReaderSidebar
-              annotations={annotations}
-              onJumpToBookmark={handleJumpToBookmark}
-              onJumpToHighlight={handleJumpToHighlight}
-              onRemoveBookmark={dbRemoveBookmark}
-              onRemoveHighlight={dbRemoveHighlight}
-              onRemoveNote={dbRemoveNote}
-              fileName={fileName}
-              localDocuments={localDocuments}
-              cloudDocuments={documents}
-              currentDocumentId={currentDocumentId || currentLocalDocId}
-              onSelectDocument={handleSelectAnyDocument}
-              onDeleteLocalDocument={handleDeleteLocalDocument}
-              isLoggedIn={!!user}
-            />
-          )}
-
-          {/* Main Content (fills remaining space on all devices) */}
+          {/* Main Content (always full-width; sidebar opens as slide-over) */}
           <main className="flex-1 min-w-0 w-full overflow-auto p-0 sm:p-2 md:p-4 lg:p-6">
             <div className="w-full max-w-none">
               {/* Document Organization */}
