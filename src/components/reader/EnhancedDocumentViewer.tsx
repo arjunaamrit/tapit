@@ -306,7 +306,7 @@ export const EnhancedDocumentViewer = ({
     <>
       <div
         ref={containerRef}
-        className="reader-card w-full max-w-none p-4 sm:p-6 lg:p-10 min-h-[calc(100dvh-64px-5rem)] reader-prose select-text cursor-text"
+        className="reader-card w-full max-w-none rounded-none shadow-none sm:rounded-xl sm:shadow-xl p-3 sm:p-6 lg:p-10 min-h-[calc(100dvh-64px-5rem)] reader-prose select-text cursor-text"
         style={{ touchAction: 'pan-x pan-y' }}
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
