@@ -726,13 +726,13 @@ const DocumentReader = () => {
           </footer>
         </main>
       ) : (
-        <div className="flex w-full h-[calc(100dvh-64px)] overflow-hidden">
+        <div className="flex w-full h-[calc(100dvh-4rem)] overflow-hidden">
           {/* Main Content (always full-width; sidebar opens as slide-over) */}
-          <main className="flex-1 min-w-0 w-full overflow-auto p-0 sm:p-2 md:p-4 lg:p-6">
-            <div className="w-full max-w-none">
-              {/* Document Organization */}
+          <main className="flex-1 min-w-0 w-full h-full overflow-auto">
+            <div className="w-full h-full flex flex-col">
+              {/* Document Organization - only show on larger screens to save space */}
               {user && currentDocumentId && (
-                <div className="mb-4">
+                <div className="hidden sm:block px-4 sm:px-6 lg:px-10 pt-4">
                   <DocumentOrganizer
                     documentId={currentDocumentId}
                     currentFolderId={currentFolderId}
@@ -746,14 +746,15 @@ const DocumentReader = () => {
                 </div>
               )}
               
-              <div className="flex items-center justify-center gap-4 mb-3 sm:mb-6 px-2 sm:px-0">
+              <div className="flex items-center justify-center gap-4 py-2 sm:py-4 px-4">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-sm text-muted-foreground">
                   <MousePointer2 className="h-4 w-4" />
-                  Double-click any word for its definition
+                  <span className="hidden sm:inline">Double-click any word for its definition</span>
+                  <span className="sm:hidden">Tap word for definition</span>
                 </div>
               </div>
               
-              <EnhancedDocumentViewer 
+              <EnhancedDocumentViewer
                 text={documentText} 
                 annotations={annotations}
                 onWordSelect={handleWordSelect}
