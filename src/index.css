@@ -178,7 +178,7 @@
   }
 
   .reader-card {
-    @apply bg-[hsl(var(--reader-bg))] text-[hsl(var(--reader-text))] rounded-xl shadow-xl;
+    @apply bg-[hsl(var(--reader-bg))] text-[hsl(var(--reader-text))];
   }
 
   .toolbar-button {
