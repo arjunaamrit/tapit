@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { X, Loader2, Volume2, Search, ExternalLink, Languages, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -338,19 +338,94 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     }
   }, [word]);
 
-  // Center the popover on screen for better UX
-  const calculatePosition = () => {
-    const popoverWidth = 480;
-    const popoverHeight = searchResult ? 600 : nestedWord ? 450 : 380;
-    
-    // Center horizontally and vertically on screen
-    const x = Math.max(16, (window.innerWidth - popoverWidth) / 2);
-    const y = Math.max(16, (window.innerHeight - popoverHeight) / 2);
-    
-    return { left: x, top: y };
-  };
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startPointerX: number;
+    startPointerY: number;
+    startLeft: number;
+    startTop: number;
+  } | null>(null);
 
-  const popoverStyle = calculatePosition();
+  const estimatedPopoverHeight = useMemo(() => {
+    // Rough estimates used only for initial placement; real bounds come from ref.
+    if (searchResult) return 600;
+    if (nestedWord) return 450;
+    return 380;
+  }, [nestedWord, searchResult]);
+
+  const getInitialPosition = useCallback(() => {
+    const popoverWidth = 480;
+    const x = Math.max(16, (window.innerWidth - popoverWidth) / 2);
+    const y = Math.max(16, (window.innerHeight - estimatedPopoverHeight) / 2);
+    return { left: x, top: y };
+  }, [estimatedPopoverHeight]);
+
+  const [popoverStyle, setPopoverStyle] = useState<{ left: number; top: number }>(() => getInitialPosition());
+
+  // Re-center when opening a *new* word (but keep user-dragged position during interaction)
+  useEffect(() => {
+    setPopoverStyle(getInitialPosition());
+  }, [word, getInitialPosition]);
+
+  const clampToViewport = useCallback((left: number, top: number) => {
+    const rect = popoverRef.current?.getBoundingClientRect();
+    const w = rect?.width ?? 480;
+    const h = rect?.height ?? estimatedPopoverHeight;
+
+    const maxLeft = Math.max(16, window.innerWidth - w - 16);
+    const maxTop = Math.max(16, window.innerHeight - h - 16);
+
+    return {
+      left: Math.min(Math.max(16, left), maxLeft),
+      top: Math.min(Math.max(16, top), maxTop),
+    };
+  }, [estimatedPopoverHeight]);
+
+  const startDrag = useCallback((e: React.PointerEvent) => {
+    // Only left mouse / primary touch
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      startPointerX: e.clientX,
+      startPointerY: e.clientY,
+      startLeft: popoverStyle.left,
+      startTop: popoverStyle.top,
+    };
+  }, [popoverStyle.left, popoverStyle.top]);
+
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    const s = dragStateRef.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const nextLeft = s.startLeft + (e.clientX - s.startPointerX);
+    const nextTop = s.startTop + (e.clientY - s.startPointerY);
+    setPopoverStyle(clampToViewport(nextLeft, nextTop));
+  }, [clampToViewport]);
+
+  const endDrag = useCallback((e: React.PointerEvent) => {
+    const s = dragStateRef.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragStateRef.current = null;
+  }, []);
+
+  // Keep popover within viewport on resize
+  useEffect(() => {
+    const onResize = () => {
+      setPopoverStyle((p) => clampToViewport(p.left, p.top));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampToViewport]);
 
   const handleSpeak = () => {
     if ('speechSynthesis' in window) {
@@ -505,13 +580,23 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
       
       {/* Popover - Bigger size */}
       <div
+        ref={popoverRef}
         className="fixed z-50 w-[480px] max-w-[calc(100vw-32px)] bg-popover border border-border rounded-xl shadow-2xl animate-in fade-in-0 zoom-in-95"
         style={popoverStyle}
+        onClick={(e) => e.stopPropagation()}
       >
         <ScrollArea className="max-h-[70vh]">
           <div className="p-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-3">
+            <div
+              className="flex items-center justify-between mb-3 select-none"
+              onPointerDown={startDrag}
+              onPointerMove={onDragMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              title="Drag to move"
+              style={{ touchAction: 'none' }}
+            >
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-lg capitalize text-foreground">{word}</h3>
                 <Button
