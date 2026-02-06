@@ -380,7 +380,7 @@ const DocumentReader = () => {
 
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-[100svh] bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border/40 bg-background/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="container mx-auto px-4">
@@ -521,7 +521,7 @@ const DocumentReader = () => {
       </header>
 
       {!documentText ? (
-        <main className="relative overflow-hidden">
+        <main className="relative overflow-hidden flex-1">
           {/* Background decorations */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="glow-orb w-96 h-96 bg-primary/30 -top-48 -right-48" />
@@ -726,10 +726,10 @@ const DocumentReader = () => {
           </footer>
         </main>
       ) : (
-        <div className="flex w-full h-[calc(100dvh-4rem)] overflow-hidden">
+        <div className="flex w-full flex-1 min-h-0 overflow-hidden">
           {/* Main Content (always full-width; sidebar opens as slide-over) */}
-          <main className="flex-1 min-w-0 w-full h-full overflow-auto">
-            <div className="w-full h-full flex flex-col">
+          <main className="flex-1 min-w-0 w-full min-h-0 overflow-auto">
+            <div className="w-full min-h-0 flex flex-col">
               {/* Document Organization - only show on larger screens to save space */}
               {user && currentDocumentId && (
                 <div className="hidden sm:block px-4 sm:px-6 lg:px-10 pt-4">
