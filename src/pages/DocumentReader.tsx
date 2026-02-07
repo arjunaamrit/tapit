@@ -17,8 +17,10 @@ import {
   Search,
   MessageSquare,
   HelpCircle,
-  PanelLeft
+  PanelLeft,
+  FileTextIcon
 } from "lucide-react";
+import { SAMPLE_DOCUMENT } from "@/data/sampleDocument";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -557,6 +559,19 @@ const DocumentReader = () => {
                 >
                   <Upload className="h-5 w-5" />
                   Upload Document
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="gap-2 px-8 py-6 text-lg rounded-2xl border-2 hover:bg-primary/5 transition-all duration-300"
+                  onClick={() => {
+                    setDocumentText(SAMPLE_DOCUMENT.content);
+                    setFileName(SAMPLE_DOCUMENT.name);
+                    toast({ title: "Sample loaded", description: "You can now explore the reader features" });
+                  }}
+                >
+                  <FileTextIcon className="h-5 w-5" />
+                  Try Sample
                 </Button>
               </div>
               
