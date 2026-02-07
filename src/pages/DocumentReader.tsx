@@ -32,7 +32,6 @@ import EnhancedDocumentUploader from "@/components/reader/EnhancedDocumentUpload
 import { EnhancedDocumentViewer } from "@/components/reader/EnhancedDocumentViewer";
 import { ReaderSidebar } from "@/components/reader/ReaderSidebar";
 import { ReaderToolbar } from "@/components/reader/ReaderToolbar";
-import { DocumentOrganizer } from "@/components/reader/DocumentOrganizer";
 import { DocumentLibraryDialog } from "@/components/reader/DocumentLibraryDialog";
 import { InDocumentSearch } from "@/components/reader/InDocumentSearch";
 import { DocumentChat } from "@/components/reader/DocumentChat";
@@ -396,7 +395,7 @@ const DocumentReader = () => {
               </Link>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 sm:gap-2 flex-nowrap overflow-x-auto">
               {user && documents.length > 0 && (
                 <DocumentLibraryDialog
                   documents={documents}
@@ -405,101 +404,101 @@ const DocumentReader = () => {
                   onDeleteDocument={handleDeleteDocumentFromLibrary}
                 />
               )}
-                  {documentText && (
-                    <>
-                      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-                        <SheetTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            title="Open document sidebar"
-                          >
-                            <PanelLeft className="h-4 w-4" />
-                            <span className="hidden sm:inline">Library</span>
-                          </Button>
-                        </SheetTrigger>
-                        <SheetContent side="left" className="p-0 w-[18rem] sm:w-[20rem]">
-                          <div className="h-[100dvh]">
-                            <ReaderSidebar
-                              annotations={annotations}
-                              onJumpToBookmark={(i) => {
-                                setIsSidebarOpen(false);
-                                handleJumpToBookmark(i);
-                              }}
-                              onJumpToHighlight={(o) => {
-                                setIsSidebarOpen(false);
-                                handleJumpToHighlight(o);
-                              }}
-                              onRemoveBookmark={dbRemoveBookmark}
-                              onRemoveHighlight={dbRemoveHighlight}
-                              onRemoveNote={dbRemoveNote}
-                              fileName={fileName}
-                              localDocuments={localDocuments}
-                              cloudDocuments={documents}
-                              currentDocumentId={currentDocumentId || currentLocalDocId}
-                              onSelectDocument={(doc) => {
-                                setIsSidebarOpen(false);
-                                handleSelectAnyDocument(doc);
-                              }}
-                              onDeleteLocalDocument={handleDeleteLocalDocument}
-                              isLoggedIn={!!user}
-                            />
-                          </div>
-                        </SheetContent>
-                      </Sheet>
+              {documentText && (
+                <>
+                  <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 px-2 sm:px-3"
+                        title="Open document sidebar"
+                      >
+                        <PanelLeft className="h-4 w-4" />
+                        <span className="hidden md:inline">Library</span>
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-[18rem] sm:w-[20rem]">
+                      <div className="h-[100dvh]">
+                        <ReaderSidebar
+                          annotations={annotations}
+                          onJumpToBookmark={(i) => {
+                            setIsSidebarOpen(false);
+                            handleJumpToBookmark(i);
+                          }}
+                          onJumpToHighlight={(o) => {
+                            setIsSidebarOpen(false);
+                            handleJumpToHighlight(o);
+                          }}
+                          onRemoveBookmark={dbRemoveBookmark}
+                          onRemoveHighlight={dbRemoveHighlight}
+                          onRemoveNote={dbRemoveNote}
+                          fileName={fileName}
+                          localDocuments={localDocuments}
+                          cloudDocuments={documents}
+                          currentDocumentId={currentDocumentId || currentLocalDocId}
+                          onSelectDocument={(doc) => {
+                            setIsSidebarOpen(false);
+                            handleSelectAnyDocument(doc);
+                          }}
+                          onDeleteLocalDocument={handleDeleteLocalDocument}
+                          isLoggedIn={!!user}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsChatOpen(true)}
-                        className="gap-2"
-                        title="Ask questions about this document"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        <span className="hidden sm:inline">Ask</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={openSearch}
-                        className="gap-2"
-                        title="Search in document (Ctrl+F)"
-                      >
-                        <Search className="h-4 w-4" />
-                        <span className="hidden sm:inline">Find</span>
-                      </Button>
-                      <ReaderToolbar
-                        isSpeaking={isSpeaking}
-                        isPaused={isPaused}
-                        onSpeak={handleSpeak}
-                        onPause={handlePause}
-                        onStop={handleStop}
-                        fontSize={fontSize}
-                        onFontSizeChange={setFontSize}
-                        lineHeight={lineHeight}
-                        onLineHeightChange={setLineHeight}
-                        fileName={fileName}
-                        documentText={documentText}
-                        annotations={annotations}
-                        speechRate={speechRate}
-                        onSpeechRateChange={setSpeechRate}
-                        selectedVoice={selectedVoice}
-                        onVoiceChange={setSelectedVoice}
-                      />
-                      <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-2">
-                        <X className="h-4 w-4" />
-                        <span className="hidden sm:inline">New Document</span>
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsChatOpen(true)}
+                    className="gap-1 px-2 sm:px-3"
+                    title="Ask questions about this document"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="hidden md:inline">Ask</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openSearch}
+                    className="gap-1 px-2 sm:px-3"
+                    title="Search in document (Ctrl+F)"
+                  >
+                    <Search className="h-4 w-4" />
+                    <span className="hidden md:inline">Find</span>
+                  </Button>
+                  <ReaderToolbar
+                    isSpeaking={isSpeaking}
+                    isPaused={isPaused}
+                    onSpeak={handleSpeak}
+                    onPause={handlePause}
+                    onStop={handleStop}
+                    fontSize={fontSize}
+                    onFontSizeChange={setFontSize}
+                    lineHeight={lineHeight}
+                    onLineHeightChange={setLineHeight}
+                    fileName={fileName}
+                    documentText={documentText}
+                    annotations={annotations}
+                    speechRate={speechRate}
+                    onSpeechRateChange={setSpeechRate}
+                    selectedVoice={selectedVoice}
+                    onVoiceChange={setSelectedVoice}
+                  />
+                  <Button variant="outline" size="sm" onClick={handleClearDocument} className="gap-1 px-2 sm:px-3">
+                    <X className="h-4 w-4" />
+                    <span className="hidden md:inline">New</span>
+                  </Button>
+                </>
+              )}
               
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2">
+                    <Button variant="ghost" size="sm" className="gap-1 px-2 sm:px-3">
                       <User className="h-4 w-4" />
-                      <span className="hidden sm:inline">{user.email?.split('@')[0]}</span>
+                      <span className="hidden lg:inline max-w-[80px] truncate">{user.email?.split('@')[0]}</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -510,9 +509,9 @@ const DocumentReader = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => navigate('/auth')} className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate('/auth')} className="gap-1 px-2 sm:px-3">
                   <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign In</span>
+                  <span className="hidden md:inline">Sign In</span>
                 </Button>
               )}
               
@@ -745,21 +744,6 @@ const DocumentReader = () => {
           {/* Main Content (always full-width; sidebar opens as slide-over) */}
           <main className="flex-1 min-w-0 w-full min-h-0 overflow-auto">
             <div className="w-full min-h-0 flex flex-col">
-              {/* Document Organization - only show on larger screens to save space */}
-              {user && currentDocumentId && (
-                <div className="hidden sm:block px-4 sm:px-6 lg:px-10 pt-4">
-                  <DocumentOrganizer
-                    documentId={currentDocumentId}
-                    currentFolderId={currentFolderId}
-                    onFolderChange={async (folderId) => {
-                      setCurrentFolderId(folderId);
-                      if (currentDocumentId) {
-                        await updateDocumentFolder(currentDocumentId, folderId);
-                      }
-                    }}
-                  />
-                </div>
-              )}
               
               <div className="flex items-center justify-center gap-4 py-2 sm:py-4 px-4">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-sm text-muted-foreground">
