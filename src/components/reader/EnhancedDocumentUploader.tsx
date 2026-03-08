@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Upload, FileText, Loader2, FileType, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +24,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
   const { toast } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedFile, setDraggedFile] = useState<string | null>(null);
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const processFile = async (file: File) => {
     const validTypes = [
       'application/pdf',
@@ -176,7 +176,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
   };
 
   const handleSelectClick = () => {
-    document.getElementById('enhanced-document-upload')?.click();
+    fileInputRef.current?.click();
   };
 
   return (
@@ -233,7 +233,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
             accept=".pdf,.docx,.epub,.txt,.md,.markdown,.html,.htm,.rtf,.mht,.mhtml"
             onChange={handleFileSelect}
             className="hidden"
-            id="enhanced-document-upload"
+            ref={fileInputRef}
           />
           
           <Button variant="default" size="lg" className="cursor-pointer gap-2" onClick={handleSelectClick}>
