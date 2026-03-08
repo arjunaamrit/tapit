@@ -24,7 +24,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
   const { toast } = useToast();
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedFile, setDraggedFile] = useState<string | null>(null);
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const processFile = async (file: File) => {
     const validTypes = [
       'application/pdf',
