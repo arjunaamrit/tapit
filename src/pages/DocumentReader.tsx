@@ -522,7 +522,7 @@ const DocumentReader = () => {
       </header>
 
       {!documentText ? (
-        <main className="relative overflow-hidden flex-1">
+        <main className="relative flex-1 overflow-y-auto">
           {/* Background decorations */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="glow-orb w-96 h-96 bg-primary/30 -top-48 -right-48" />
