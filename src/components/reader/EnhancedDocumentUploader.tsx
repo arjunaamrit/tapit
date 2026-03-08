@@ -171,6 +171,12 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
     if (file) {
       processFile(file);
     }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const handleSelectClick = () => {
+    document.getElementById('enhanced-document-upload')?.click();
   };
 
   return (
