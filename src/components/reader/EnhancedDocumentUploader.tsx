@@ -176,7 +176,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
   };
 
   const handleSelectClick = () => {
-    document.getElementById('enhanced-document-upload')?.click();
+    fileInputRef.current?.click();
   };
 
   return (
