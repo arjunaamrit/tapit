@@ -233,7 +233,7 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
             accept=".pdf,.docx,.epub,.txt,.md,.markdown,.html,.htm,.rtf,.mht,.mhtml"
             onChange={handleFileSelect}
             className="hidden"
-            id="enhanced-document-upload"
+            ref={fileInputRef}
           />
           
           <Button variant="default" size="lg" className="cursor-pointer gap-2" onClick={handleSelectClick}>
