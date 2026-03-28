@@ -3,6 +3,7 @@ import { Upload, FileText, Loader2, FileType, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { getAuthHeaders } from "@/lib/auth-helpers";
 
 interface EnhancedDocumentUploaderProps {
   onDocumentParsed: (text: string, fileName: string) => void;
