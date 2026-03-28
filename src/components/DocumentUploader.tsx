@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Upload, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthHeaders } from "@/lib/auth-helpers";
 
 interface DocumentUploaderProps {
   onDocumentParsed: (text: string, fileName: string) => void;
@@ -49,10 +50,12 @@ const DocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }: Documen
       const formData = new FormData();
       formData.append('file', file);
 
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document`,
         {
           method: 'POST',
+          headers: authHeaders,
           body: formData,
         }
       );

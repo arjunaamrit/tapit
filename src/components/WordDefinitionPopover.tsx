@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthHeaders } from "@/lib/auth-helpers";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -141,12 +142,14 @@ const NestedDefinition = ({
         // This gives better contextual meaning than the original document context
         const contextAroundWord = parentDefinition;
         
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...authHeaders,
             },
             body: JSON.stringify({ word, context: contextAroundWord }),
           }
@@ -299,12 +302,14 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
       setNestedWord(null);
       
       try {
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...authHeaders,
             },
             body: JSON.stringify({ word, context }),
           }

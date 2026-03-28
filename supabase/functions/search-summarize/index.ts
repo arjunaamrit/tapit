@@ -1,13 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+// Simple in-memory rate limiter (per user, 15 requests per minute for search)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 15;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
 
 // Enhanced function to extract text content from HTML with better structure
 function extractTextFromHtml(html: string): string {
-  // Remove script, style, nav, footer, aside, and ad-related tags
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   text = text.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
@@ -16,23 +33,20 @@ function extractTextFromHtml(html: string): string {
   text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
   text = text.replace(/<!--[\s\S]*?-->/g, '');
   
-  // Try to extract main content areas first
   const mainContentMatch = text.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
-                           text.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
-                           text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+                            text.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
+                            text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
   
   if (mainContentMatch) {
     text = mainContentMatch[1];
   }
   
-  // Remove HTML tags but preserve some structure
   text = text.replace(/<\/p>/gi, '\n\n');
   text = text.replace(/<\/h[1-6]>/gi, '\n\n');
   text = text.replace(/<\/li>/gi, '\n');
   text = text.replace(/<br\s*\/?>/gi, '\n');
   text = text.replace(/<[^>]+>/g, ' ');
   
-  // Decode HTML entities
   text = text.replace(/&nbsp;/g, ' ');
   text = text.replace(/&amp;/g, '&');
   text = text.replace(/&lt;/g, '<');
@@ -40,16 +54,13 @@ function extractTextFromHtml(html: string): string {
   text = text.replace(/&quot;/g, '"');
   text = text.replace(/&#39;/g, "'");
   
-  // Clean up whitespace
   text = text.replace(/[ \t]+/g, ' ');
   text = text.replace(/\n\s*\n/g, '\n\n');
   text = text.trim();
   
-  // Increase content limit for better summaries
   return text.substring(0, 8000);
 }
 
-// Fetch content from a URL with improved extraction
 async function fetchUrlContent(url: string): Promise<{ url: string; title: string; content: string; description: string } | null> {
   try {
     console.log(`Fetching: ${url}`);
@@ -69,16 +80,13 @@ async function fetchUrlContent(url: string): Promise<{ url: string; title: strin
     
     const html = await response.text();
     
-    // Extract title
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : url;
     
-    // Extract meta description
     const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
     const description = descMatch ? descMatch[1].trim() : '';
     
-    // Extract content
     const content = extractTextFromHtml(html);
     
     return { url, title, content, description };
@@ -89,12 +97,10 @@ async function fetchUrlContent(url: string): Promise<{ url: string; title: strin
   }
 }
 
-// Use DuckDuckGo HTML search to find URLs - fetch more results
 async function searchForUrls(query: string): Promise<string[]> {
   try {
     console.log(`Searching for: ${query}`);
     
-    // Use DuckDuckGo HTML search
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const response = await fetch(searchUrl, {
       headers: {
@@ -109,7 +115,6 @@ async function searchForUrls(query: string): Promise<string[]> {
     
     const html = await response.text();
     
-    // Extract URLs from search results - get more URLs
     const urlRegex = /href="\/\/duckduckgo\.com\/l\/\?uddg=([^&"]+)/g;
     const urls: string[] = [];
     let match;
@@ -117,7 +122,6 @@ async function searchForUrls(query: string): Promise<string[]> {
     while ((match = urlRegex.exec(html)) !== null && urls.length < 8) {
       try {
         const decodedUrl = decodeURIComponent(match[1]);
-        // Filter out some non-useful domains
         if (decodedUrl.startsWith('http') && 
             !decodedUrl.includes('youtube.com') &&
             !decodedUrl.includes('facebook.com') &&
@@ -144,6 +148,36 @@ serve(async (req) => {
   }
 
   try {
+    // --- Auth check ---
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = claimsData.claims.sub as string;
+
+    // --- Rate limit check ---
+    if (!checkRateLimit(userId)) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { query } = await req.json();
     
     if (!query || typeof query !== 'string') {
@@ -155,7 +189,6 @@ serve(async (req) => {
 
     console.log(`Processing search query: ${query}`);
 
-    // Step 1: Search for URLs
     const urls = await searchForUrls(query);
     
     if (urls.length === 0) {
@@ -168,7 +201,6 @@ serve(async (req) => {
       );
     }
 
-    // Step 2: Fetch content from URLs in parallel
     const contentPromises = urls.map(url => fetchUrlContent(url));
     const results = await Promise.all(contentPromises);
     const validResults = results.filter(r => r !== null) as { url: string; title: string; content: string; description: string }[];
@@ -185,7 +217,6 @@ serve(async (req) => {
 
     console.log(`Successfully fetched ${validResults.length} pages`);
 
-    // Step 3: Summarize using Lovable AI with enhanced prompt
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');

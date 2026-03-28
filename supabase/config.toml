@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.search-summarize]
 verify_jwt = false
+
+[functions.chat-document]
+verify_jwt = false
+
+[functions.translate-word]
+verify_jwt = false
