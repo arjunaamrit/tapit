@@ -141,12 +141,14 @@ const NestedDefinition = ({
         // This gives better contextual meaning than the original document context
         const contextAroundWord = parentDefinition;
         
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...authHeaders,
             },
             body: JSON.stringify({ word, context: contextAroundWord }),
           }
