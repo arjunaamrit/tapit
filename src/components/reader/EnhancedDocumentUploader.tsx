@@ -104,10 +104,12 @@ const EnhancedDocumentUploader = ({ onDocumentParsed, isLoading, setIsLoading }:
       const formData = new FormData();
       formData.append('file', file);
 
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document`,
         {
           method: 'POST',
+          headers: authHeaders,
           body: formData,
         }
       );

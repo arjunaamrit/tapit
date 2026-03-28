@@ -55,11 +55,12 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
     let assistantContent = '';
 
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           question: userMessage.content,

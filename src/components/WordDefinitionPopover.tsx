@@ -301,12 +301,14 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
       setNestedWord(null);
       
       try {
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...authHeaders,
             },
             body: JSON.stringify({ word, context }),
           }
