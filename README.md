@@ -1,5 +1,7 @@
 # Welcome to your Lovable project
 
+> **⚠️ Security Reminder:** Enable Row Level Security (RLS) on **all** database tables. Every table with a `user_id` column should have RLS policies ensuring authenticated users can only read/write their own rows, and anonymous users have no insert/update access.
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/78b70389-b4f9-4b67-a7b0-d2b847dd8976
