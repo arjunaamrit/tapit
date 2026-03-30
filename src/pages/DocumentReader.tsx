@@ -523,200 +523,276 @@ const DocumentReader = () => {
 
       {!documentText ? (
         <main className="relative flex-1 overflow-y-auto">
-          {/* Background decorations */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="glow-orb w-96 h-96 bg-primary/30 -top-48 -right-48" />
-            <div className="glow-orb w-80 h-80 bg-accent/20 top-1/3 -left-40 animation-delay-300" />
-            <div className="glow-orb w-64 h-64 bg-primary/20 bottom-20 right-1/4" />
+          {/* Ambient background */}
+          <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+            <div className="absolute w-[600px] h-[600px] rounded-full bg-primary/15 blur-[120px] -top-60 -right-60 animate-pulse" />
+            <div className="absolute w-[500px] h-[500px] rounded-full bg-accent/10 blur-[100px] top-1/2 -left-60 animate-pulse animation-delay-300" />
+            <div className="absolute w-[400px] h-[400px] rounded-full bg-primary/10 blur-[80px] bottom-0 right-1/3 animate-pulse animation-delay-600" />
           </div>
 
-          {/* Hero Section */}
-          <section className="relative container mx-auto px-4 py-20 lg:py-32">
+          {/* ─── HERO ─── */}
+          <section className="relative container mx-auto px-4 pt-16 pb-24 lg:pt-28 lg:pb-36">
             <div className="max-w-5xl mx-auto text-center">
-              <div className="animate-fade-in-up">
-                <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
-                  <Sparkles className="h-4 w-4" />
-                  AI-Powered Reading Assistant
-                </div>
+              <div className="animate-fade-in-up inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold tracking-wide uppercase mb-8">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI-Powered Reading
               </div>
-              
-              <h1 className="animate-fade-in-up animation-delay-150 text-5xl md:text-7xl font-display font-bold mb-6 leading-tight">
-                Read <span className="text-gradient">Smarter</span>,
-                <br />Learn <span className="text-gradient">Faster</span>
+
+              <h1 className="animate-fade-in-up animation-delay-150 text-4xl sm:text-6xl lg:text-7xl font-display font-extrabold tracking-tight leading-[1.08] mb-6">
+                Read{" "}
+                <span className="relative inline-block">
+                  <span className="text-gradient">Smarter</span>
+                  <span className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent rounded-full opacity-60" />
+                </span>
+                ,<br className="hidden sm:block" />{" "}
+                Learn{" "}
+                <span className="relative inline-block">
+                  <span className="text-gradient">Faster</span>
+                  <span className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-accent to-primary rounded-full opacity-60" />
+                </span>
               </h1>
-              
-              <p className="animate-fade-in-up animation-delay-300 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12">
-                Transform any document into an interactive learning experience. 
-                Get instant definitions, annotate with ease, and listen to your content.
+
+              <p className="animate-fade-in-up animation-delay-300 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
+                Transform any document into an interactive learning experience with instant AI definitions, annotations, and text-to-speech.
               </p>
 
-              <div className="animate-fade-in-up animation-delay-450 flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                <Button 
-                  size="lg" 
-                  className="gap-2 px-8 py-6 text-lg rounded-2xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
+              <div className="animate-fade-in-up animation-delay-450 flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto gap-2 px-8 py-6 text-base rounded-2xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
                   onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <Upload className="h-5 w-5" />
                   Upload Document
                 </Button>
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   variant="outline"
-                  className="gap-2 px-8 py-6 text-lg rounded-2xl border-2 hover:bg-primary/5 transition-all duration-300"
+                  className="w-full sm:w-auto gap-2 px-8 py-6 text-base rounded-2xl border-2 border-border hover:border-primary/40 hover:bg-primary/5 transition-all"
                   onClick={() => {
                     setDocumentText(SAMPLE_DOCUMENT.content);
                     setFileName(SAMPLE_DOCUMENT.name);
-                    toast({ title: "Sample loaded", description: "You can now explore the reader features" });
+                    toast({ title: "Sample loaded", description: "Explore all reader features" });
                   }}
                 >
                   <FileTextIcon className="h-5 w-5" />
                   Try Sample
                 </Button>
               </div>
-              
-              <div className="animate-fade-in-up animation-delay-500 flex items-center justify-center gap-6 mb-16">
+
+              <div className="animate-fade-in-up animation-delay-600 flex items-center justify-center gap-5 text-xs text-muted-foreground mb-16">
                 <button
                   onClick={() => document.getElementById('features-section')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
+                  className="hover:text-foreground flex items-center gap-1.5 transition-colors"
                 >
-                  Learn More
-                  <ArrowRight className="h-4 w-4" />
+                  Learn More <ArrowRight className="h-3.5 w-3.5" />
                 </button>
+                <span className="w-px h-4 bg-border" />
                 <button
                   onClick={openOnboarding}
-                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
+                  className="hover:text-foreground flex items-center gap-1.5 transition-colors"
                 >
-                  <HelpCircle className="h-4 w-4" />
-                  Take a Tour
+                  <HelpCircle className="h-3.5 w-3.5" /> Take a Tour
                 </button>
               </div>
 
-              {/* Interactive Preview */}
-              <div className="animate-fade-in-up animation-delay-600 relative max-w-4xl mx-auto">
-                <div className="glass-card rounded-3xl p-8 shadow-2xl border border-primary/10 hover:border-primary/20 transition-all duration-500">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-3 h-3 rounded-full bg-destructive/60" />
-                    <div className="w-3 h-3 rounded-full bg-accent/60" />
-                    <div className="w-3 h-3 rounded-full bg-primary/60" />
-                    <span className="ml-4 text-sm text-muted-foreground font-medium">Your Document</span>
-                    <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+              {/* ─── Interactive Preview Card ─── */}
+              <div className="animate-fade-in-up animation-delay-600 relative max-w-3xl mx-auto">
+                <div className="rounded-3xl border border-border/60 bg-card/70 backdrop-blur-2xl shadow-2xl shadow-primary/5 p-6 sm:p-8 transition-all hover:border-primary/20 hover:shadow-primary/10">
+                  {/* Window chrome */}
+                  <div className="flex items-center gap-2 mb-5">
+                    <div className="w-3 h-3 rounded-full bg-destructive/50" />
+                    <div className="w-3 h-3 rounded-full bg-accent/50" />
+                    <div className="w-3 h-3 rounded-full bg-primary/50" />
+                    <span className="ml-3 text-xs text-muted-foreground font-medium tracking-wide">Your Document</span>
+                    <div className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
                       <Volume2 className="h-3 w-3" />
-                      <span>Text-to-Speech</span>
+                      TTS
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-reader-bg to-background rounded-2xl p-8 text-left reader-prose text-reader-text relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
-                    <p className="text-lg mb-4 relative z-10">
-                      The concept of <span className="bg-primary/30 px-1.5 py-0.5 rounded cursor-pointer border-b-2 border-primary font-medium">artificial intelligence</span> has 
-                      evolved significantly over the decades, transforming from theoretical 
-                      discussions into <span className="highlight-yellow px-1.5 py-0.5 rounded font-medium">practical applications</span> that 
-                      impact our daily lives...
+
+                  {/* Simulated reader */}
+                  <div className="rounded-2xl bg-gradient-to-br from-background via-background to-muted/40 p-6 sm:p-8 text-left reader-prose relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
+                    <p className="text-base sm:text-lg mb-4 text-foreground/90 relative z-10 leading-relaxed">
+                      The concept of{" "}
+                      <span className="bg-primary/25 px-1.5 py-0.5 rounded border-b-2 border-primary font-medium cursor-pointer hover:bg-primary/35 transition-colors">
+                        artificial intelligence
+                      </span>{" "}
+                      has evolved significantly, transforming from theory into{" "}
+                      <span className="highlight-yellow px-1.5 py-0.5 rounded font-medium">
+                        practical applications
+                      </span>{" "}
+                      that shape our daily lives...
                     </p>
-                    <div className="inline-flex items-center gap-3 mt-4 px-5 py-3 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl border border-primary/20">
-                      <div className="p-2 rounded-lg bg-primary/10">
+
+                    {/* Definition tooltip */}
+                    <div className="inline-flex items-center gap-3 mt-3 px-4 py-3 bg-card border border-border/60 rounded-2xl shadow-lg">
+                      <div className="p-2 rounded-xl bg-primary/10">
                         <Zap className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">artificial intelligence</p>
-                        <p className="text-sm font-medium">The simulation of human intelligence by machines...</p>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">artificial intelligence</p>
+                        <p className="text-sm text-foreground/80">The simulation of human intelligence by machines...</p>
                       </div>
                     </div>
                   </div>
                 </div>
-                
-                {/* Floating elements */}
-                <div className="absolute -top-6 -right-2 md:-right-12 animate-float">
-                  <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2">
-                    <MousePointer2 className="h-4 w-4" />
-                    Double-tap any word
+
+                {/* Floating badges */}
+                <div className="absolute -top-4 -right-1 sm:-right-8 animate-float z-10">
+                  <div className="bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2">
+                    <MousePointer2 className="h-3.5 w-3.5" />
+                    Double-tap
                   </div>
                 </div>
-                <div className="absolute -bottom-6 -left-2 md:-left-12 animate-float-delayed">
-                  <div className="bg-gradient-to-r from-accent to-accent/80 text-accent-foreground px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4" />
-                    Smart annotations
+                <div className="absolute -bottom-4 -left-1 sm:-left-8 animate-float-delayed z-10">
+                  <div className="bg-accent text-accent-foreground px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2">
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    Annotate
                   </div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Features Section */}
+          {/* ─── FEATURES ─── */}
           <section id="features-section" className="relative container mx-auto px-4 py-20">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
-                Everything You Need to Read Better
+            <div className="text-center mb-14">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold mb-3 tracking-tight">
+                Everything You Need
               </h2>
-              <p className="text-muted-foreground max-w-xl mx-auto">
-                Powerful features designed to enhance comprehension and make reading more productive.
+              <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
+                Powerful features designed to enhance comprehension and make reading productive.
               </p>
             </div>
-            
-            <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+
+            <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
               {features.map((feature, index) => (
-                <div 
+                <div
                   key={feature.title}
-                  className="feature-card group"
-                  style={{ animationDelay: `${index * 100}ms` }}
+                  className="group relative rounded-3xl border border-border/50 bg-card/50 backdrop-blur-xl p-7 transition-all duration-500 hover:bg-card/80 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
+                  style={{ animationDelay: `${index * 80}ms` }}
                 >
-                  <div className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                    <feature.icon className="h-7 w-7 text-primary" />
+                  <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                    <feature.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="text-xl font-display font-semibold mb-3">{feature.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                  <h3 className="text-lg font-display font-semibold mb-2">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Upload Section */}
+          {/* ─── THEME SHOWCASE ─── */}
+          <section className="relative container mx-auto px-4 py-16">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-10">
+                <h2 className="text-2xl sm:text-3xl font-display font-bold mb-3 tracking-tight">
+                  Designed for Your Eyes
+                </h2>
+                <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
+                  Switch between light & dark themes seamlessly. Every color adapts contextually.
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-5">
+                {/* Light theme card */}
+                <div className="rounded-3xl p-6 border border-border/50" style={{ background: 'hsl(220, 25%, 97%)', color: 'hsl(220, 30%, 8%)' }}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'hsl(252, 85%, 60%)', color: 'white' }}>
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-display font-semibold">Light Mode</span>
+                  </div>
+                  <div className="rounded-2xl p-4 space-y-2" style={{ background: 'white' }}>
+                    <div className="h-2.5 rounded-full w-3/4" style={{ background: 'hsl(220, 15%, 90%)' }} />
+                    <div className="h-2.5 rounded-full w-full" style={{ background: 'hsl(220, 15%, 90%)' }} />
+                    <div className="h-2.5 rounded-full w-5/6" style={{ background: 'hsl(220, 15%, 90%)' }} />
+                    <div className="inline-block mt-2 px-3 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'hsl(48, 100%, 70%)', color: 'hsl(30, 10%, 20%)' }}>
+                      Highlighted text
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    {['hsl(252, 85%, 60%)', 'hsl(172, 66%, 50%)', 'hsl(48, 100%, 70%)', 'hsl(330, 80%, 80%)', 'hsl(142, 70%, 70%)'].map((c, i) => (
+                      <div key={i} className="w-6 h-6 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dark theme card */}
+                <div className="rounded-3xl p-6 border border-border/50" style={{ background: 'hsl(224, 35%, 6%)', color: 'hsl(220, 15%, 96%)' }}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'hsl(252, 85%, 65%)', color: 'white' }}>
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-display font-semibold">Dark Mode</span>
+                  </div>
+                  <div className="rounded-2xl p-4 space-y-2" style={{ background: 'hsl(224, 30%, 10%)' }}>
+                    <div className="h-2.5 rounded-full w-3/4" style={{ background: 'hsl(224, 20%, 18%)' }} />
+                    <div className="h-2.5 rounded-full w-full" style={{ background: 'hsl(224, 20%, 18%)' }} />
+                    <div className="h-2.5 rounded-full w-5/6" style={{ background: 'hsl(224, 20%, 18%)' }} />
+                    <div className="inline-block mt-2 px-3 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'hsl(48, 80%, 30%)', color: 'hsl(220, 15%, 92%)' }}>
+                      Highlighted text
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    {['hsl(252, 85%, 65%)', 'hsl(172, 66%, 45%)', 'hsl(48, 80%, 30%)', 'hsl(330, 60%, 35%)', 'hsl(142, 50%, 25%)'].map((c, i) => (
+                      <div key={i} className="w-6 h-6 rounded-full border-2 shadow-sm" style={{ background: c, borderColor: 'hsl(224, 20%, 18%)' }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ─── UPLOAD ─── */}
           <section id="upload-section" className="relative container mx-auto px-4 py-20">
             <div className="max-w-3xl mx-auto">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
+              <div className="text-center mb-10">
+                <h2 className="text-2xl sm:text-3xl font-display font-bold mb-3 tracking-tight">
                   Start Reading Now
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground text-sm sm:text-base">
                   Drop your document and experience the difference.
                 </p>
               </div>
 
-              <EnhancedDocumentUploader 
+              <EnhancedDocumentUploader
                 onDocumentParsed={handleDocumentParsed}
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
               />
-              
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Supports PDF, Word (.docx), EPUB, TXT, Markdown, HTML, and RTF files
+
+              <p className="text-center text-xs text-muted-foreground mt-5">
+                PDF, Word, EPUB, TXT, Markdown, HTML, RTF
               </p>
             </div>
           </section>
 
-
-          {/* CTA Section */}
+          {/* ─── CTA ─── */}
           <section className="relative container mx-auto px-4 py-20">
-            <div className="max-w-4xl mx-auto glass-card rounded-3xl p-12 text-center bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5">
-              <h2 className="text-2xl md:text-3xl font-display font-bold mb-4">
+            <div className="max-w-3xl mx-auto rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/8 via-accent/5 to-primary/8 backdrop-blur-xl p-10 sm:p-14 text-center">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold mb-4">
                 Ready to Transform Your Reading?
               </h2>
-              <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-                Start your reading journey with ReadMate. Upload a document and experience the difference.
+              <p className="text-muted-foreground mb-8 max-w-lg mx-auto text-sm sm:text-base">
+                Join thousands of learners using ReadMate to read smarter every day.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button 
-                  size="lg" 
-                  className="gap-2 px-8 py-6 text-lg rounded-2xl shadow-lg shadow-primary/25"
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto gap-2 px-8 py-6 text-base rounded-2xl shadow-lg shadow-primary/20"
                   onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <Upload className="h-5 w-5" />
                   Get Started Free
                 </Button>
                 {!user && (
-                  <Button 
+                  <Button
                     variant="outline"
-                    size="lg" 
-                    className="gap-2 px-8 py-6 text-lg rounded-2xl"
+                    size="lg"
+                    className="w-full sm:w-auto gap-2 px-8 py-6 text-base rounded-2xl border-2"
                     onClick={() => navigate('/auth')}
                   >
                     <User className="h-5 w-5" />
@@ -727,15 +803,15 @@ const DocumentReader = () => {
             </div>
           </section>
 
-          {/* Footer */}
-          <footer className="border-t border-border/40 py-8">
-            <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-                <span>•</span>
-                <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+          {/* ─── FOOTER ─── */}
+          <footer className="border-t border-border/30 py-8">
+            <div className="container mx-auto px-4 text-center text-xs text-muted-foreground">
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+                <span className="w-px h-3 bg-border" />
+                <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               </div>
-              <p>© {new Date().getFullYear()} ReadMate. Built with ❤️ for learners everywhere.</p>
+              <p>© {new Date().getFullYear()} ReadMate. Built with ❤️ for learners.</p>
             </div>
           </footer>
         </main>
