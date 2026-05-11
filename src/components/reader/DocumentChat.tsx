@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getAuthHeaders } from '@/lib/auth-helpers';
+import { chatWithDocumentStream } from '@/services/geminiService';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,8 +18,6 @@ interface DocumentChatProps {
   documentContent: string;
   documentName: string;
 }
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-document`;
 
 export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }: DocumentChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,7 +34,6 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
   }, [isOpen]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
@@ -56,97 +53,17 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
     let assistantContent = '';
 
     try {
-      const authHeaders = await getAuthHeaders();
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          question: userMessage.content,
-          documentContent,
-          conversationHistory: messages,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to get response');
-      }
-
-      if (!response.body) {
-        throw new Error('No response body');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = '';
-
-      // Add empty assistant message that we'll update
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                return updated;
-              });
-            }
-          } catch {
-            // Incomplete JSON, put it back
-            textBuffer = line + '\n' + textBuffer;
-            break;
-          }
-        }
+      const stream = chatWithDocumentStream(userMessage.content, documentContent, messages);
+      for await (const chunk of stream) {
+        assistantContent += chunk;
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+          return updated;
+        });
       }
-
-      // Final flush
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split('\n')) {
-          if (!raw) continue;
-          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
-          if (raw.startsWith(':') || raw.trim() === '') continue;
-          if (!raw.startsWith('data: ')) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                return updated;
-              });
-            }
-          } catch { /* ignore */ }
-        }
-      }
-
     } catch (error) {
       console.error('Chat error:', error);
       toast({
@@ -154,7 +71,6 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
         description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
-      // Remove the empty assistant message if there was an error
       setMessages(prev => prev.filter((_, i) => i !== prev.length - 1 || prev[i].content !== ''));
     } finally {
       setIsLoading(false);
@@ -171,16 +87,13 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
     }
   };
 
-  const clearChat = () => {
-    setMessages([]);
-  };
+  const clearChat = () => setMessages([]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 animate-fade-in">
       <div className="glass-card rounded-2xl shadow-2xl border border-border/50 w-[380px] max-w-[calc(100vw-32px)] flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-primary/10">
@@ -193,29 +106,16 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
           </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={clearChat}
-                title="Clear chat"
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearChat} title="Clear chat">
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onClose}
-              title="Close"
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} title="Close">
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Messages */}
         <ScrollArea ref={scrollAreaRef} className="flex-1 h-[350px]">
           <div className="p-4 space-y-4">
             {messages.length === 0 ? (
@@ -223,9 +123,7 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
                 <div className="p-3 rounded-full bg-primary/10 w-fit mx-auto mb-3">
                   <Bot className="h-6 w-6 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Ask me anything about this document
-                </p>
+                <p className="text-sm text-muted-foreground mb-2">Ask me anything about this document</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {['Summarize this', 'Key points?', 'Main topics?'].map((suggestion) => (
                     <button
@@ -243,13 +141,7 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
               </div>
             ) : (
               messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    'flex gap-2',
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  )}
-                >
+                <div key={index} className={cn('flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {message.role === 'assistant' && (
                     <div className="p-1.5 rounded-lg bg-primary/10 h-fit shrink-0">
                       <Bot className="h-3.5 w-3.5 text-primary" />
@@ -281,7 +173,6 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
           </div>
         </ScrollArea>
 
-        {/* Input */}
         <div className="p-3 border-t border-border/50 bg-background/50">
           <div className="flex gap-2">
             <Input
@@ -293,17 +184,8 @@ export const DocumentChat = ({ isOpen, onClose, documentContent, documentName }:
               disabled={isLoading}
               className="flex-1 h-10 rounded-xl bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary"
             />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="h-10 w-10 rounded-xl shrink-0"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+            <Button onClick={handleSend} disabled={!input.trim() || isLoading} size="icon" className="h-10 w-10 rounded-xl shrink-0">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
         </div>

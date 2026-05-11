@@ -5,16 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-interface Source {
-  url: string;
-  title: string;
-}
-
-interface SearchResult {
-  summary: string;
-  sources: Source[];
-}
+import { searchAndSummarize, SearchResult, Source } from "@/services/geminiService";
 
 const SearchSummarize = () => {
   const [query, setQuery] = useState("");
@@ -37,22 +28,7 @@ const SearchSummarize = () => {
     setResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('search-summarize', {
-        body: { query: query.trim() }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data.error) {
-        toast({
-          title: "Error",
-          description: data.error,
-          variant: "destructive",
-        });
-        return;
-      }
+      const data = await searchAndSummarize(query.trim());
 
       setResult(data);
     } catch (error) {
