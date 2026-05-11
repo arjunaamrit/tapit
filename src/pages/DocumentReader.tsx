@@ -128,9 +128,11 @@ const DocumentReader = () => {
     })),
   };
 
+  const getSpeech = () => (typeof window !== 'undefined' ? window.speechSynthesis : undefined);
+
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      getSpeech()?.cancel();
     };
   }, []);
 
@@ -149,24 +151,28 @@ const DocumentReader = () => {
 
   const handleSpeak = () => {
     if (!documentText) return;
+    const synth = getSpeech();
+    if (!synth) {
+      toast({ title: "Not supported", description: "Text-to-speech is not available in this browser", variant: "destructive" });
+      return;
+    }
 
     if (isPaused) {
-      window.speechSynthesis.resume();
+      synth.resume();
       setIsPaused(false);
       return;
     }
 
-    window.speechSynthesis.cancel();
+    synth.cancel();
     const utterance = new SpeechSynthesisUtterance(documentText);
     utterance.rate = speechRate;
     utterance.pitch = 1;
-    
-    // Set voice if available
-    const voices = window.speechSynthesis.getVoices();
+
+    const voices = synth.getVoices();
     if (voices.length > 0 && selectedVoice < voices.length) {
       utterance.voice = voices[selectedVoice];
     }
-    
+
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
       setIsSpeaking(false);
@@ -179,16 +185,16 @@ const DocumentReader = () => {
     };
 
     speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+    synth.speak(utterance);
   };
 
   const handlePause = () => {
-    window.speechSynthesis.pause();
+    getSpeech()?.pause();
     setIsPaused(true);
   };
 
   const handleStop = () => {
-    window.speechSynthesis.cancel();
+    getSpeech()?.cancel();
     setIsSpeaking(false);
     setIsPaused(false);
   };
@@ -233,7 +239,7 @@ const DocumentReader = () => {
   };
 
   const handleClearDocument = () => {
-    window.speechSynthesis.cancel();
+    getSpeech()?.cancel();
     setIsSpeaking(false);
     setIsPaused(false);
     setDocumentText("");
