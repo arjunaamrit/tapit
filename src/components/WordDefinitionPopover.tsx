@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthHeaders } from "@/lib/auth-helpers";
+import { defineWord, translateText, searchAndSummarize, SearchResult, Source, getMoreInfo, explainSentence } from "@/services/geminiService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -12,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 const LANGUAGES = [
   { code: "es", name: "Spanish" },
@@ -36,16 +38,6 @@ const LANGUAGES = [
   { code: "ms", name: "Malay" },
 ];
 
-interface Source {
-  url: string;
-  title: string;
-}
-
-interface SearchResult {
-  summary: string;
-  sources: Source[];
-}
-
 interface WordDefinitionPopoverProps {
   word: string;
   context: string;
@@ -63,6 +55,8 @@ const ClickableText = ({
   onWordClick: (word: string) => void;
   className?: string;
 }) => {
+  const lastTapRef = useRef<number>(0);
+
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const selection = window.getSelection();
@@ -80,8 +74,9 @@ const ClickableText = ({
           let start = range.startOffset;
           let end = range.startOffset;
           
-          while (start > 0 && /\w/.test(nodeText[start - 1])) start--;
-          while (end < nodeText.length && /\w/.test(nodeText[end])) end++;
+          // Use Unicode-aware word boundary detection
+          while (start > 0 && /[\p{L}\p{M}\p{N}]/u.test(nodeText[start - 1])) start--;
+          while (end < nodeText.length && /[\p{L}\p{M}\p{N}]/u.test(nodeText[end])) end++;
           
           if (start < end) {
             range.setStart(node, start);
@@ -94,18 +89,183 @@ const ClickableText = ({
       }
     }
 
-    if (selectedText && selectedText.length >= 2 && /^[a-zA-Z'-]+$/.test(selectedText)) {
+    // Improved regex to support international characters
+    if (selectedText && selectedText.length >= 2 && /^[\p{L}\p{M}\p{N}'-]+$/u.test(selectedText)) {
       onWordClick(selectedText);
     }
   }, [onWordClick]);
 
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current;
+    if (now - lastTap < 300) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const touch = e.changedTouches[0];
+      if (touch) {
+        const mouseEvent = new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+        });
+        e.target?.dispatchEvent(mouseEvent);
+      }
+    }
+    lastTapRef.current = now;
+  }, []);
+
   return (
     <span 
       onDoubleClick={handleDoubleClick}
+      onTouchEnd={handleTouchEnd}
       className={`cursor-text select-text ${className}`}
     >
       {text}
     </span>
+  );
+};
+
+// Reusable AI Search Section component
+const AISearchSection = ({ 
+  initialQuery,
+  targetLanguage,
+  targetLanguageName
+}: { 
+  initialQuery: string;
+  targetLanguage?: string | null;
+  targetLanguageName?: string | null;
+}) => {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [translatedSearchSummary, setTranslatedSearchSummary] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  // Update query when initialQuery changes (e.g. when word changes)
+  useEffect(() => {
+    setSearchQuery(initialQuery);
+    setSearchResult(null);
+    setTranslatedSearchSummary(null);
+  }, [initialQuery]);
+
+  // Translate search results if a language is selected
+  useEffect(() => {
+    const translateResult = async () => {
+      if (!targetLanguageName || !searchResult?.summary) {
+        setTranslatedSearchSummary(null);
+        return;
+      }
+      
+      setIsTranslating(true);
+      try {
+        const data = await translateText(searchResult.summary, targetLanguageName);
+        setTranslatedSearchSummary(data.translation);
+      } catch (err) {
+        console.error('Search translation error:', err);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+
+    translateResult();
+  }, [targetLanguageName, searchResult]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    setSearchResult(null);
+
+    try {
+      const data = await searchAndSummarize(searchQuery.trim());
+      setSearchResult(data);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Search failed",
+        description: error instanceof Error ? error.message : "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 space-y-3">
+      <form onSubmit={handleSearch} className="relative group">
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/30 via-primary/10 to-primary/30 opacity-60 group-focus-within:opacity-100 blur-sm transition-opacity" />
+        <div className="relative flex items-center gap-2 bg-background border-2 border-primary/40 group-focus-within:border-primary rounded-xl pl-3 pr-1.5 py-1 shadow-sm transition-colors">
+          <Search className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-primary shrink-0 hidden sm:inline">AI Search</span>
+          <div className="h-5 w-px bg-border shrink-0 hidden sm:block" />
+          <Input
+            type="text"
+            placeholder="Ask AI anything about this..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 h-9 text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-muted-foreground/60"
+            disabled={isSearching}
+          />
+          <Button
+            type="submit"
+            disabled={isSearching || !searchQuery.trim()}
+            size="sm"
+            className="h-8 px-3 text-xs font-semibold rounded-lg shrink-0"
+          >
+            {isSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Ask AI'}
+          </Button>
+        </div>
+      </form>
+
+      {(isSearching || isTranslating || searchResult) && (
+        <div className="bg-muted/20 rounded-lg border border-border/50 overflow-hidden animate-in fade-in slide-in-from-top-1">
+          <div className="p-3">
+            {isSearching ? (
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">AI is searching...</span>
+              </div>
+            ) : isTranslating ? (
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Translating results...</span>
+              </div>
+            ) : searchResult ? (
+              <div className="space-y-3">
+                <div className="text-xs text-foreground leading-relaxed">
+                  {translatedSearchSummary || searchResult.summary}
+                </div>
+                
+                {searchResult.sources && searchResult.sources.length > 0 && (
+                  <div className="pt-2 border-t border-border/30">
+                    <div className="flex flex-wrap gap-1.5">
+                      {searchResult.sources.slice(0, 3).map((source, idx) => (
+                        <a
+                          key={idx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-background border border-border rounded text-[10px] text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          <span className="max-w-[80px] truncate">{source.title}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -138,30 +298,10 @@ const NestedDefinition = ({
       setError("");
       
       try {
-        // Use the parent definition as context for the nested word lookup
-        // This gives better contextual meaning than the original document context
         const contextAroundWord = parentDefinition;
-        
-        const authHeaders = await getAuthHeaders();
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders,
-            },
-            body: JSON.stringify({ word, context: contextAroundWord }),
-          }
-        );
+        const data = await defineWord(word, contextAroundWord);
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to get definition');
-        }
-
-        if (data.success && data.definition) {
+        if (data && data.success && data.definition) {
           setDefinition(data.definition);
         } else {
           throw new Error('No definition received');
@@ -177,7 +317,6 @@ const NestedDefinition = ({
     fetchDefinition();
   }, [word, parentDefinition]);
 
-  // Translate definition when language is selected and definition is ready
   useEffect(() => {
     const translateDefinition = async () => {
       if (!targetLanguage || !targetLanguageName || !definition) {
@@ -187,11 +326,7 @@ const NestedDefinition = ({
       
       setIsTranslating(true);
       try {
-        const { data, error } = await supabase.functions.invoke('translate-word', {
-          body: { word: definition, targetLanguage, targetLanguageName }
-        });
-        
-        if (error) throw error;
+        const data = await translateText(definition, targetLanguageName);
         setTranslatedDefinition(data.translation);
       } catch (err) {
         console.error('Translation error:', err);
@@ -220,48 +355,50 @@ const NestedDefinition = ({
   const displayDefinition = targetLanguage && translatedDefinition ? translatedDefinition : definition;
 
   return (
-    <div className={`border-l-2 border-primary/40 pl-3 mt-3 ${depth > 3 ? 'opacity-75' : ''}`}>
-      <div className="flex items-center justify-between gap-2 mb-1">
+    <div className={`border-l-2 border-primary/30 pl-4 mt-4 mb-2 ${depth > 3 ? 'opacity-90' : ''}`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm capitalize text-foreground">{word}</span>
+          <span className="font-bold text-sm capitalize text-foreground">{word}</span>
           <Button
             variant="ghost"
             size="sm"
-            className="h-5 w-5 p-0"
+            className="h-6 w-6 p-0 hover:bg-primary/10"
             onClick={handleSpeak}
           >
-            <Volume2 className="h-3 w-3" />
+            <Volume2 className="h-3.5 w-3.5" />
           </Button>
           {targetLanguageName && (
-            <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+            <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-semibold uppercase tracking-wider">
               {targetLanguageName}
             </span>
           )}
         </div>
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={onClose}>
-          <X className="h-3 w-3" />
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={onClose}>
+          <X className="h-3.5 w-3.5" />
         </Button>
       </div>
       
       {isLoading ? (
         <div className="flex items-center gap-2 py-2">
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          <Loader2 className="h-3 w-3 animate-spin text-primary" />
           <span className="text-xs text-muted-foreground">Looking up...</span>
         </div>
       ) : error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p className="text-xs text-destructive bg-destructive/5 p-2 rounded">{error}</p>
       ) : isTranslating ? (
         <div className="flex items-center gap-2 py-2">
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          <Loader2 className="h-3 w-3 animate-spin text-primary" />
           <span className="text-xs text-muted-foreground">Translating...</span>
         </div>
       ) : (
-        <p className="text-xs text-foreground leading-relaxed font-medium">
-          <ClickableText text={displayDefinition} onWordClick={handleNestedWordClick} />
-        </p>
+        <>
+          <p className="text-xs text-foreground leading-relaxed font-medium">
+            <ClickableText text={displayDefinition} onWordClick={handleNestedWordClick} />
+          </p>
+        </>
       )}
 
-      {nestedWord && depth < 5 && (
+      {nestedWord && depth < 10 && (
         <NestedDefinition 
           word={nestedWord}
           parentDefinition={definition}
@@ -282,66 +419,19 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   const [error, setError] = useState<string>("");
   const [nestedWord, setNestedWord] = useState<string | null>(null);
   
-  // AI Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  
+  // More info state
+  const [moreInfo, setMoreInfo] = useState<string | null>(null);
+  const [translatedMoreInfo, setTranslatedMoreInfo] = useState<string | null>(null);
+  const [isTranslatingMoreInfo, setIsTranslatingMoreInfo] = useState(false);
+  const [isFetchingMoreInfo, setIsFetchingMoreInfo] = useState(false);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
+
   // Translation state
   const [translation, setTranslation] = useState<string | null>(null);
   const [translatedDefinition, setTranslatedDefinition] = useState<string | null>(null);
-  const [translatedSearchSummary, setTranslatedSearchSummary] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [selectedLanguageCode, setSelectedLanguageCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchDefinition = async () => {
-      setIsLoading(true);
-      setError("");
-      setNestedWord(null);
-      
-      try {
-        const authHeaders = await getAuthHeaders();
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/define-word`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders,
-            },
-            body: JSON.stringify({ word, context }),
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to get definition');
-        }
-
-        if (data.success && data.definition) {
-          setDefinition(data.definition);
-        } else {
-          throw new Error('No definition received');
-        }
-      } catch (err) {
-        console.error('Error fetching definition:', err);
-        setError(err instanceof Error ? err.message : 'Failed to get definition');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDefinition();
-  }, [word, context]);
-
-  const handleNestedWordClick = useCallback((clickedWord: string) => {
-    if (clickedWord.toLowerCase() !== word.toLowerCase()) {
-      setNestedWord(clickedWord);
-    }
-  }, [word]);
 
   const popoverRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
@@ -352,23 +442,60 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     startTop: number;
   } | null>(null);
 
-  const estimatedPopoverHeight = useMemo(() => {
-    // Rough estimates used only for initial placement; real bounds come from ref.
-    if (searchResult) return 600;
-    if (nestedWord) return 450;
-    return 380;
-  }, [nestedWord, searchResult]);
-
   const getInitialPosition = useCallback(() => {
     const popoverWidth = 480;
+    
+    // If position is provided, try to place it near the click
+    if (position) {
+      const x = Math.max(16, Math.min(position.x - popoverWidth / 2, window.innerWidth - popoverWidth - 16));
+      const y = Math.max(16, Math.min(position.y, window.innerHeight - 400 - 16));
+      return { left: x, top: y };
+    }
+
     const x = Math.max(16, (window.innerWidth - popoverWidth) / 2);
-    const y = Math.max(16, (window.innerHeight - estimatedPopoverHeight) / 2);
+    const y = 100; // Start near top
     return { left: x, top: y };
-  }, [estimatedPopoverHeight]);
+  }, [position]);
 
   const [popoverStyle, setPopoverStyle] = useState<{ left: number; top: number }>(() => getInitialPosition());
 
-  // Re-center when opening a *new* word (but keep user-dragged position during interaction)
+  const isSentence = useMemo(() => word.trim().includes(" "), [word]);
+
+  useEffect(() => {
+    const fetchDefinition = async () => {
+      setIsLoading(true);
+      setError("");
+      setNestedWord(null);
+      setMoreInfo(null);
+      setShowMoreInfo(false);
+      
+      try {
+        if (isSentence) {
+          const data = await explainSentence(word, context);
+          if (data && data.success && data.explanation) {
+            setDefinition(data.explanation);
+          } else {
+            throw new Error('No explanation received');
+          }
+        } else {
+          const data = await defineWord(word, context);
+          if (data && data.success && data.definition) {
+            setDefinition(data.definition);
+          } else {
+            throw new Error('No definition received');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching definition/explanation:', err);
+        setError(err instanceof Error ? err.message : 'Failed to get info');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDefinition();
+  }, [word, context, isSentence]);
+
   useEffect(() => {
     setPopoverStyle(getInitialPosition());
   }, [word, getInitialPosition]);
@@ -376,7 +503,7 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
   const clampToViewport = useCallback((left: number, top: number) => {
     const rect = popoverRef.current?.getBoundingClientRect();
     const w = rect?.width ?? 480;
-    const h = rect?.height ?? estimatedPopoverHeight;
+    const h = rect?.height ?? 400;
 
     const maxLeft = Math.max(16, window.innerWidth - w - 16);
     const maxTop = Math.max(16, window.innerHeight - h - 16);
@@ -385,12 +512,10 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
       left: Math.min(Math.max(16, left), maxLeft),
       top: Math.min(Math.max(16, top), maxTop),
     };
-  }, [estimatedPopoverHeight]);
+  }, []);
 
   const startDrag = useCallback((e: React.PointerEvent) => {
-    // Only left mouse / primary touch
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-
     e.preventDefault();
     e.stopPropagation();
 
@@ -423,7 +548,6 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     dragStateRef.current = null;
   }, []);
 
-  // Keep popover within viewport on resize
   useEffect(() => {
     const onResize = () => {
       setPopoverStyle((p) => clampToViewport(p.left, p.top));
@@ -432,18 +556,52 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     return () => window.removeEventListener('resize', onResize);
   }, [clampToViewport]);
 
-  const handleSpeak = () => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'en-US';
-      speechSynthesis.speak(utterance);
-    } else {
-      toast({
-        title: "Not supported",
-        description: "Text-to-speech is not supported in your browser.",
-        variant: "destructive",
-      });
+  const pickBestVoice = (lang = 'en-US'): SpeechSynthesisVoice | null => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    const langPrefix = lang.split('-')[0];
+    const inLang = voices.filter(v => v.lang?.toLowerCase().startsWith(langPrefix));
+    const pool = inLang.length ? inLang : voices;
+    // Prefer high-quality natural/neural voices
+    const preferences = [
+      /natural/i, /neural/i, /premium/i, /enhanced/i, /online/i,
+      /google/i, /microsoft.*(aria|jenny|guy|davis|natural)/i, /samantha/i,
+    ];
+    for (const re of preferences) {
+      const match = pool.find(v => re.test(v.name));
+      if (match) return match;
     }
+    return pool[0];
+  };
+
+  const speakText = (text: string, lang = 'en-US') => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      toast({ title: 'Speech not supported', description: 'Your browser does not support text-to-speech.', variant: 'destructive' });
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    utter.rate = 1;
+    utter.pitch = 1;
+    const voice = pickBestVoice(lang);
+    if (voice) utter.voice = voice;
+    window.speechSynthesis.speak(utter);
+  };
+
+  const handleSpeak = () => {
+    // Read the entire popup contents: word/sentence + definition + expanded Deep Dive (if shown)
+    const parts: string[] = [];
+    if (selectedLanguage && translation) {
+      parts.push(`${selectedLanguage}: ${translation}.`);
+    } else {
+      parts.push(word);
+    }
+    const def = selectedLanguage && translatedDefinition ? translatedDefinition : definition;
+    if (def) parts.push(def);
+    if (showMoreInfo && (translatedMoreInfo || moreInfo)) parts.push((selectedLanguage && translatedMoreInfo) ? translatedMoreInfo : moreInfo!);
+    speakText(parts.join('. '));
   };
 
   const handleTranslate = async (langCode: string, langName: string) => {
@@ -452,262 +610,230 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
     setSelectedLanguageCode(langCode);
     setTranslation(null);
     setTranslatedDefinition(null);
-    setTranslatedSearchSummary(null);
-    
-    // Helper to add delay between API calls to avoid rate limiting
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-    
-    // Helper to translate with retry on rate limit
-    const translateWithRetry = async (text: string, retries = 2): Promise<string | null> => {
-      for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-          const { data, error } = await supabase.functions.invoke('translate-word', {
-            body: { word: text, targetLanguage: langCode, targetLanguageName: langName }
-          });
-          
-          if (error) {
-            const errorMsg = error.message || '';
-            if (errorMsg.includes('Rate limit') || errorMsg.includes('429')) {
-              if (attempt < retries) {
-                await delay(1500 * (attempt + 1)); // Increasing delay: 1.5s, 3s
-                continue;
-              }
-            }
-            throw error;
-          }
-          
-          return data?.translation || null;
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
-            if (attempt < retries) {
-              await delay(1500 * (attempt + 1));
-              continue;
-            }
-          }
-          throw err;
-        }
-      }
-      return null;
-    };
     
     try {
-      // Translate sequentially with delays to avoid rate limiting
-      const wordTranslation = await translateWithRetry(word);
-      setTranslation(wordTranslation);
-      
-      if (definition) {
-        await delay(500); // Small delay between calls
-        const defTranslation = await translateWithRetry(definition);
-        setTranslatedDefinition(defTranslation);
-      }
-      
-      if (searchResult?.summary) {
-        await delay(500);
-        const summaryTranslation = await translateWithRetry(searchResult.summary);
-        setTranslatedSearchSummary(summaryTranslation);
+      const [wordTrans, defTrans] = await Promise.all([
+        translateText(word, langName),
+        definition ? translateText(definition, langName) : Promise.resolve({ translation: null })
+      ]);
+
+      setTranslation(wordTrans.translation);
+      if (defTrans.translation) {
+        setTranslatedDefinition(defTrans.translation);
       }
     } catch (error) {
       console.error('Translation error:', error);
       toast({
         title: "Translation failed",
-        description: "Rate limit exceeded. Please wait a moment and try again.",
+        description: "Please try again later.",
         variant: "destructive",
       });
-      setSelectedLanguage(null);
-      setSelectedLanguageCode(null);
     } finally {
       setIsTranslating(false);
     }
   };
 
-  // Clear translation when language is deselected
+  // Auto-translate Deep Dive content when language is selected or moreInfo loads
+  useEffect(() => {
+    const run = async () => {
+      if (!selectedLanguage || !moreInfo) {
+        setTranslatedMoreInfo(null);
+        return;
+      }
+      setIsTranslatingMoreInfo(true);
+      try {
+        const data = await translateText(moreInfo, selectedLanguage);
+        setTranslatedMoreInfo(data.translation);
+      } catch (err) {
+        console.error('Deep Dive translation error:', err);
+      } finally {
+        setIsTranslatingMoreInfo(false);
+      }
+    };
+    run();
+  }, [selectedLanguage, moreInfo]);
+
   const handleClearTranslation = () => {
     setSelectedLanguage(null);
     setSelectedLanguageCode(null);
     setTranslation(null);
     setTranslatedDefinition(null);
-    setTranslatedSearchSummary(null);
+    setTranslatedMoreInfo(null);
   };
 
-  const handleSearch = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    
-    if (!searchQuery.trim()) {
-      toast({
-        title: "Please enter a search query",
-        variant: "destructive",
-      });
+  const handleNestedWordClick = useCallback((clickedWord: string) => {
+    if (clickedWord.toLowerCase() !== word.toLowerCase()) {
+      setNestedWord(clickedWord);
+    }
+  }, [word]);
+
+  const handleGetMoreInfo = async () => {
+    if (moreInfo) {
+      setShowMoreInfo(!showMoreInfo);
       return;
     }
 
-    setIsSearching(true);
-    setSearchResult(null);
-
+    setIsFetchingMoreInfo(true);
     try {
-      const { data, error } = await supabase.functions.invoke('search-summarize', {
-        body: { query: searchQuery.trim() }
-      });
-
-      if (error) {
-        throw error;
+      const data = await getMoreInfo(word, context);
+      if (data.success) {
+        setMoreInfo(data.info);
+        setShowMoreInfo(true);
       }
-
-      if (data.error) {
-        toast({
-          title: "Error",
-          description: data.error,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setSearchResult(data);
-    } catch (error) {
-      console.error('Search error:', error);
+    } catch (err) {
+      console.error('Error fetching more info:', err);
       toast({
-        title: "Search failed",
-        description: error instanceof Error ? error.message : "Please try again later",
+        title: "Failed to get more info",
+        description: "Please try again later.",
         variant: "destructive",
       });
     } finally {
-      setIsSearching(false);
+      setIsFetchingMoreInfo(false);
     }
   };
 
   return (
     <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-50" 
-        onClick={onClose}
-      />
-      
-      {/* Popover - Bigger size */}
+      <div className="fixed inset-0 z-50 pointer-events-none" />
       <div
         ref={popoverRef}
-        className="fixed z-50 w-[480px] max-w-[calc(100vw-32px)] bg-popover border border-border rounded-xl shadow-2xl animate-in fade-in-0 zoom-in-95"
+        className="fixed z-50 w-[480px] max-w-[calc(100vw-32px)] max-h-[85vh] bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl animate-in fade-in-0 zoom-in-95 overflow-hidden flex flex-col"
         style={popoverStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <ScrollArea className="max-h-[70vh]">
-          <div className="p-4">
-            {/* Header */}
-            <div
-              className="flex items-center justify-between mb-3 select-none"
-              onPointerDown={startDrag}
-              onPointerMove={onDragMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              title="Drag to move"
-              style={{ touchAction: 'none' }}
-            >
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg capitalize text-foreground">{word}</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={handleSpeak}
-                  title="Listen to pronunciation"
-                >
-                  <Volume2 className="h-4 w-4" />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1 px-2"
-                      disabled={isTranslating}
-                      title="Translate to another language"
-                    >
-                      {isTranslating ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Languages className="h-4 w-4" />
-                          <ChevronDown className="h-3 w-3" />
-                        </>
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">
-                    {LANGUAGES.map((lang) => (
-                      <DropdownMenuItem
-                        key={lang.code}
-                        onClick={() => handleTranslate(lang.code, lang.name)}
-                        className="cursor-pointer"
-                      >
-                        {lang.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={onClose}
-              >
-                <X className="h-4 w-4" />
+        {/* Header - Draggable */}
+        <div
+          className="flex items-center justify-between p-3 border-b border-border/50 bg-muted/20 cursor-move select-none"
+          onPointerDown={startDrag}
+          onPointerMove={onDragMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          style={{ touchAction: 'none' }}
+        >
+          <div className="flex items-center gap-2 max-w-[70%]">
+            <h3 className="font-bold text-base capitalize text-foreground truncate">
+              {isSentence ? "Sentence Explanation" : word}
+            </h3>
+            {!isSentence && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleSpeak}>
+                <Volume2 className="h-4 w-4" />
               </Button>
-            </div>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 gap-1 px-2" disabled={isTranslating}>
+                  {isTranslating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto">
+                {LANGUAGES.map((lang) => (
+                  <DropdownMenuItem key={lang.code} onClick={() => handleTranslate(lang.code, lang.name)}>
+                    {lang.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-            {/* Translation Indicator - Shows when a language is selected */}
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-4">
             {selectedLanguage && (
-              <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Languages className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-medium text-primary">
-                      Translating to {selectedLanguage}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={handleClearTranslation}
-                  >
-                    Show Original
-                  </Button>
+              <div className="p-2.5 bg-primary/5 rounded-lg border border-primary/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Languages className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-medium text-primary">
+                    {selectedLanguage}: {translation || '...'}
+                  </span>
                 </div>
-                {isTranslating && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Translating all content...</span>
-                  </div>
-                )}
-                {!isTranslating && translation && (
-                  <div className="mt-2">
-                    <p className="text-xs text-muted-foreground">Word:</p>
-                    <p className="text-sm font-medium">{translation}</p>
-                  </div>
-                )}
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={handleClearTranslation}>
+                  Clear
+                </Button>
               </div>
             )}
-            
-            {/* Definition Content - Shows translated if language selected */}
-            <div className="min-h-[60px] mb-4">
+
+            <div className="min-h-[40px]">
               {isLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">{isSentence ? "Explaining..." : "Defining..."}</span>
                 </div>
               ) : error ? (
-                <p className="text-sm text-destructive">{error}</p>
+                <p className="text-sm text-destructive bg-destructive/5 p-3 rounded-lg">{error}</p>
               ) : (
-                <p className="text-sm text-foreground leading-relaxed font-medium">
+                <div className="text-sm text-foreground leading-relaxed">
                   <ClickableText 
                     text={selectedLanguage && translatedDefinition ? translatedDefinition : definition} 
                     onWordClick={handleNestedWordClick} 
                   />
-                </p>
+                </div>
               )}
             </div>
 
-            {/* Nested Definition - Pass selected language */}
+            {/* Expand / More Info Button */}
+            {!isLoading && !error && (
+              <div className="pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider gap-1.5 hover:bg-primary/10 hover:text-primary transition-colors"
+                  onClick={handleGetMoreInfo}
+                  disabled={isFetchingMoreInfo}
+                >
+                  {isFetchingMoreInfo ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : showMoreInfo ? (
+                    <Minimize2 className="h-3 w-3" />
+                  ) : (
+                    <Maximize2 className="h-3 w-3" />
+                  )}
+                  {showMoreInfo ? 'Show Less' : 'Expand for More Info'}
+                </Button>
+
+                {showMoreInfo && moreInfo && (
+                  <div className="mt-3 bg-primary/5 rounded-xl border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
+                    <div className="p-3 pb-1 flex items-center gap-2">
+                      <div className="h-1 w-1 rounded-full bg-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Deep Dive</span>
+                      {selectedLanguage && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-semibold uppercase tracking-wider">
+                          {selectedLanguage}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3 pt-1">
+                      {isTranslatingMoreInfo ? (
+                        <div className="flex items-center gap-2 py-2">
+                          <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                          <span className="text-xs text-muted-foreground">Translating...</span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-foreground leading-relaxed italic">
+                          <ClickableText
+                            text={selectedLanguage && translatedMoreInfo ? translatedMoreInfo : moreInfo}
+                            onWordClick={handleNestedWordClick}
+                          />
+                        </p>
+                      )}
+                      <div className="mt-2 text-[9px] text-muted-foreground/50 text-right">
+                        ~129 words
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI Search for main word */}
+            <AISearchSection 
+              initialQuery={word} 
+              targetLanguage={selectedLanguageCode} 
+              targetLanguageName={selectedLanguage} 
+            />
+
             {nestedWord && (
               <NestedDefinition 
                 word={nestedWord}
@@ -718,110 +844,6 @@ const WordDefinitionPopover = ({ word, context, position, onClose }: WordDefinit
                 targetLanguageName={selectedLanguage}
               />
             )}
-
-            {/* Hint */}
-            {!isLoading && !error && (
-              <p className="text-xs text-muted-foreground mb-3 italic">
-                💡 Double-tap any word in the definition to look it up
-              </p>
-            )}
-
-            {/* Divider */}
-            <div className="border-t border-border my-3" />
-
-            {/* AI Search Section - Enhanced UI */}
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 p-4 rounded-xl border border-primary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-1.5 bg-primary/20 rounded-lg">
-                    <Search className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="text-sm font-semibold text-foreground">AI Web Search</span>
-                </div>
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      type="text"
-                      placeholder="Ask anything..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-11 text-sm bg-background/80 border-primary/30 focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/60"
-                      disabled={isSearching}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isSearching || !searchQuery.trim()}
-                    className="h-11 px-5 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
-                  >
-                    {isSearching ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4 mr-2" />
-                        Search
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </div>
-
-              {isSearching && (
-                <div className="text-center py-6">
-                  <div className="inline-flex items-center gap-3 px-4 py-2 bg-primary/10 rounded-full">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span className="text-sm text-foreground">Searching the web...</span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Analyzing multiple sources</p>
-                </div>
-              )}
-
-              {searchResult && !isSearching && (
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-br from-muted/50 to-muted/30 p-4 rounded-xl border border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        AI Summary {selectedLanguage && translatedSearchSummary && `(${selectedLanguage})`}
-                      </span>
-                    </div>
-                    <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                      <ClickableText 
-                        text={selectedLanguage && translatedSearchSummary ? translatedSearchSummary : searchResult.summary} 
-                        onWordClick={handleNestedWordClick} 
-                      />
-                    </div>
-                  </div>
-
-                  {searchResult.sources && searchResult.sources.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                        Sources ({searchResult.sources.length})
-                      </p>
-                      <div className="space-y-1.5">
-                        {searchResult.sources.slice(0, 5).map((source, index) => (
-                          <a
-                            key={index}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2.5 p-2.5 bg-background rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
-                          >
-                            <div className="flex-shrink-0 w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary">
-                              {index + 1}
-                            </div>
-                            <span className="text-xs text-muted-foreground group-hover:text-foreground truncate flex-1">
-                              {source.title}
-                            </span>
-                            <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </ScrollArea>
       </div>
